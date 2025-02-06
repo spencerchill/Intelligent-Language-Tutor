@@ -13,12 +13,17 @@ class PhonemeModel:
         
         """
         Uses nvidia GPU if user has CUDA installed
+        Uses Apple GPU if user has compatible mac.
         """
 
         if torch.cuda.is_available():
             device = torch.device('cuda')
             self.model.to(self.device)
             print(f'Using device: {torch.cuda.get_device_name(0)}')
+        elif torch.backends.mps.is_available():
+            device = torch.device('mps')
+            self.model.to(self.device)
+            print('Using MPS GPU')  
         else:
             print('Using CPU.')
     
