@@ -4,13 +4,13 @@ import sounddevice as sd
 import librosa 
 
 class PhonemeModel:
-    def __init__(self, model_name = "Bluecast/wav2vec2-Phoneme", sample_rate = 16000):
+    def __init__(self, model_name="Bluecast/wav2vec2-Phoneme", sample_rate=16000):
         self.processor = AutoProcessor.from_pretrained(model_name)
         self.model = AutoModelForCTC.from_pretrained(model_name)
         self.sample_rate = sample_rate
         self.device = torch.device('cpu')
         # GPU optimization
-        
+
         """
         Uses nvidia GPU if user has CUDA installed
         Uses Apple GPU if user has compatible mac.
@@ -30,21 +30,23 @@ class PhonemeModel:
     def load_audio(self, audio_path):
         """
         Currently loading audio file for simplicity. 
-        Add record functionality later.
+        Add record functionality later. USE SOUNDDEVICE instead of librosa
+        Add error handling
+        
         """
-        audio_input, sr = librosa.load(audio_path, sr = self.sample_rate)
+        audio_input, sr = librosa.load(audio_path, sr=self.sample_rate)
         return audio_input
     
     def predict_phonemes(self, audio_input):
 
-        input_values = self.processor(audio_input, return_tensors = "pt").input_values
+        input_values = self.processor(audio_input, return_tensors="pt", sampling_rate=self.sample_rate).input_values
         input_values = input_values.to(self.device) 
 
         #make predictions
         with torch.no_grad():
             logits = self.model(input_values).logits
 
-        predicted_ids = torch.argmax(logits, dim = -1)
+        predicted_ids = torch.argmax(logits, dim=-1)
         phonemes = self.processor.decode(predicted_ids[0])
 
         return phonemes
@@ -56,4 +58,4 @@ class PhonemeModel:
         audio_input = self.load_audio(audio_path)
         predicted_phonemes = self.predict_phonemes(audio_input)
 
-        return predicted_phonemes
+        return predicted_phonemes.upper().split()
