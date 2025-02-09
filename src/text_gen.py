@@ -15,15 +15,11 @@ def gen_random_text(file_path=FILE_PATH):
         random_sentence = random.choice(sentences)
 
         return random_sentence
-
-        
-        #Right now just printing but later we can adjust this to show an error box on frontend
-        #to do: better error handling
-        
-  
+# error handling for now
     except FileNotFoundError as e:
         print(f"{file_path} does not exist")
     except json.JSONDecodeError as e:
         print(f"failed decoding json file at {file_path}")
     except Exception as e:
         print(f"Error: {str(e)}")
+
