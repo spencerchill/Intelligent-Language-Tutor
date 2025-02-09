@@ -2,5 +2,4 @@ torch
 transformers
 sounddevice
 librosa
-tkinter
 pathlib

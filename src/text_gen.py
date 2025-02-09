@@ -16,10 +16,10 @@ def gen_random_text(file_path=FILE_PATH):
 
         return random_sentence
 
-        """
-        Right now just printing but later we can adjust this to show an error box on frontend
-        to do: better error handling
-        """
+        
+        #Right now just printing but later we can adjust this to show an error box on frontend
+        #to do: better error handling
+        
   
     except FileNotFoundError as e:
         print(f"{file_path} does not exist")
