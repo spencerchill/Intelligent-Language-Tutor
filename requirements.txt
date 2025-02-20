@@ -4,3 +4,5 @@ sounddevice
 librosa
 pathlib
 g2p_en
+eng-to-ipa
+pyaudio
