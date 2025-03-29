@@ -63,13 +63,3 @@ class PhonemeModel:
         phonemes = self.processor.decode(predicted_ids[0])
 
         return phonemes.upper().split()
-
-
-audio_path = r"C:\Users\oblum\Downloads\record_out.wav"
-
-stt_model = STTModel()
-Phoneme_Model = PhonemeModel()
-transcription = stt_model.transcribe(audio_path)
-expected_output = Phoneme_Model.get_phoneme_prediction(audio_path)
-print("Transcription:", transcription)
-print("Output:", expected_output)
