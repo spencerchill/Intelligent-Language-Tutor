@@ -3,15 +3,20 @@ import re
 import eng_to_ipa as ipa
 
 # this module holds text processing functions
-# soon to be added:
-# Dynamic Time Warping or Levensthien word distance
-# segment phonemes / align if needed?
 
-def text_to_ipaPhoneme(text):
+
+# dont delete this pls
+def text_to_phoneme(text):
+     g2p = G2p()
+     phonemes = g2p(text)
+     #remove stress markers of phonetic representation
+     return [re.sub(r'\d+', '', phoneme) for phoneme in phonemes]
+
+def text_to_ipa_phoneme(text):
     ipa_transcription = ipa.convert(text)
     return ipa_transcription
 
 if __name__ == "__main__":
-    text = "The red dog jumped over the white fence"    
-    IPA_Output = text_to_ipaPhoneme(text)
-    print("IPA:", IPA_Output)
+    text = "the air is cool"    
+    phoneme_output = text_to_phoneme(text)
+    print("ARPABET:", phoneme_output)
