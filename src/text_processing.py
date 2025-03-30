@@ -18,5 +18,5 @@ def text_to_ipa_phoneme(text):
 
 if __name__ == "__main__":
     text = "the air is cool"    
-    phoneme_output = text_to_phoneme(text)
-    print("ARPABET:", phoneme_output)
+    phoneme_output = text_to_ipa_phoneme(text)
+    print("IPA:", phoneme_output)
