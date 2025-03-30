@@ -1,3 +1,4 @@
+import numpy as np
 # phoneme to character mapping
 # we can change these mappings to ipa and this code works fine. its up to you guys
 PHONEME_MAPPINGS = {
@@ -14,37 +15,55 @@ PHONEME_MAPPINGS = {
     'IY': 1, 'OW': 2, 'OY': 2, 'UH': 1, 'UW': 1
 }
 
-def get_lcs_indices(target_phonemes, user_phonemes):
+def levenshtein_indices(target_phonemes, user_phonemes):
     """
-    Get indices of phonemes that are not part of the LCS between two phoneme sequences.
-    Returns a set of indices from target_phonemes that are not in the LCS.
+    Levenshteinn distance algorithm.
+    Returns mispronounced indices.
     """
+    # TODO: better scoring metrics which are not being calculated now
     m, n = len(target_phonemes), len(user_phonemes)
-    dp = [[0] * (n + 1) for _ in range(m + 1)]
-    # build LCS table
+    dp = np.zeros((m + 1, n + 1), dtype=int)
+
+    for i in range(m + 1):
+        dp[i][0] = i  # cost of deleting i phonemes
+    for j in range(n + 1):
+        dp[0][j] = j  # cost of inserting j phonemes
+
+    # building edit distance matrix
     for i in range(1, m + 1):
         for j in range(1, n + 1):
-            if target_phonemes[i-1] == user_phonemes[j-1]:
-                dp[i][j] = dp[i-1][j-1] + 1
-            else:
-                dp[i][j] = max(dp[i-1][j], dp[i][j-1])
-    # traverse table
-    i, j = m, n
+            cost = 0 if target_phonemes[i - 1] == user_phonemes[j - 1] else 1  
+            dp[i][j] = min(
+                dp[i - 1][j] + 1,  # deletion
+                dp[i][j - 1] + 1,  # insertion
+                dp[i - 1][j - 1] + cost  # substitution
+            )
 
-    lcs_indices = set()
-    while i > 0 and j > 0:
-        if target_phonemes[i-1] == user_phonemes[j-1]:
-            # match... add curr index to set
-            lcs_indices.add(i-1)
+    # backtracking dp
+    i, j = m, n
+    mispronounced_indices = set()
+    while i > 0 or j > 0:
+        if target_phonemes[i - 1] == user_phonemes[j - 1]:  
+            # match
             i -= 1
             j -= 1
-        elif dp[i-1][j] > dp[i][j-1]:
+        elif dp[i][j] == dp[i - 1][j] + 1:  
+            # Deletion (missing phoneme)
+            mispronounced_indices.add(i - 1)
             i -= 1
-        else:
+        elif dp[i][j] == dp[i][j - 1] + 1:  
+            # insertion (extra phoneme)
+            # highlight phoneme before and after if they exist
+            mispronounced_indices.add(i - 1)
+            if i < m:
+                mispronounced_indices.add(i)
             j -= 1
-   
-    # return indices that are NOTTT in the LCS
-    return set(range(len(target_phonemes))) - lcs_indices
+        else:  
+            # substitution
+            mispronounced_indices.add(i - 1)
+            i -= 1
+            j -= 1
+    return mispronounced_indices
 
 def create_phoneme_to_char_mapping(word, phonemes):
     """
@@ -101,8 +120,8 @@ def get_pronunciation_score(target_phrase, target_phonemes, user_phonemes):
         target_word = target_words[i]
         user_word = user_words[i]
         original_word = original_words[i]
-        # get indices of phonemes that are not in LCS
-        mispronounced_indices = get_lcs_indices(target_word, user_word)
+        # get indices of phonemes that are substitutions/deletions/insertions
+        mispronounced_indices = levenshtein_indices(target_word, user_word)
         # create mapping from phoneme indices to character indices
         phoneme_to_char = create_phoneme_to_char_mapping(original_word, target_word)
 
