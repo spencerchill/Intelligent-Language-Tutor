@@ -8,7 +8,7 @@ FILE_PATH = Path(__file__).resolve().parent.parent / 'res' / 'sentences.json'
 def gen_random_text(file_path=FILE_PATH):
     try:
 
-        with open(file_path, "r") as file:
+        with open(file_path, "r", encoding="utf-8") as file:
                 text = json.load(file)
 
         sentences = [entry["sentence"] for entry in text["data"]]

@@ -35,8 +35,7 @@ class STTModel:
         transcription = self.processor.decode(predicted_ids[0])
 
         return transcription
-
-
+        
 class PhonemeModel:
     def __init__(self, model_name="Bluecast/wav2vec2-Phoneme", sample_rate=16000):
         from transformers import AutoProcessor, AutoModelForCTC
