@@ -2,7 +2,8 @@ import pyaudio
 import wave
 import threading
 import os
-
+from pydub import AudioSegment
+from pydub.playback import play
 
 class AudioRecorder:
     def __init__(self, callback):
@@ -10,7 +11,15 @@ class AudioRecorder:
         self.audio = pyaudio.PyAudio()
         # avoid circular dependency between app and recorder
         self.callback = callback
-        self.OUTPUT_FILENAME = None
+        self.filename = None
+
+    def play_recording(self):
+        """Play the last recorded audio file."""
+        if self.filename and os.path.exists(self.filename):
+            def _play():
+                audio = AudioSegment.from_wav(self.filename)
+                play(audio)
+            threading.Thread(target=_play, daemon=True).start()
 
     def is_recording(self):
         return self._is_recording
@@ -57,19 +66,17 @@ class AudioRecorder:
         stream.stop_stream()
         stream.close()
 
-        i = 1
-        while os.path.exists(f"ILT_Audio{i}.wav"):
-            i += 1
-        self.OUTPUT_FILENAME = f"ILT_Audio{i}.wav"
+        
+        self.filename = f"user_recording.wav"
         # Save the recording to a WAV file
-        with wave.open(self.OUTPUT_FILENAME, "wb") as wf:
+        with wave.open(self.filename, "wb") as wf:
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(self.audio.get_sample_size(FORMAT))
             wf.setframerate(RATE)
             wf.writeframes(b"".join(frames))
 
-        print(f"Audio file saved as {self.OUTPUT_FILENAME}")
+        print(f"Audio file saved as {self.filename}")
         # process audio now that recording is stopped
         threading.Thread(
-            target=self.callback, args=(self.OUTPUT_FILENAME,), daemon=True
+            target=self.callback, args=(self.filename,), daemon=True
         ).start()

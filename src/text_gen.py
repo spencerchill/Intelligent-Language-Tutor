@@ -1,5 +1,6 @@
 import json
 import random
+import string
 from pathlib import Path
 
 #FILE_PATH = os.path.join( os.path.dirname(os.path.abspath(__file__)), '..', 'res', 'sentences.json')
@@ -13,8 +14,8 @@ def gen_random_text(file_path=FILE_PATH):
 
         sentences = [entry["sentence"] for entry in text["data"]]
         random_sentence = random.choice(sentences)
-
-        return random_sentence
+        # remove punctuation
+        return random_sentence.translate(str.maketrans("", "", ".,")) 
 # error handling for now
     except FileNotFoundError as e:
         print(f"{file_path} does not exist")
