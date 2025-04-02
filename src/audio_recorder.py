@@ -5,6 +5,11 @@ import os
 from pydub import AudioSegment
 from pydub.playback import play
 
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
+CHUNK = 1024
+
 class AudioRecorder:
     def __init__(self, callback):
         self._is_recording = False
@@ -20,6 +25,10 @@ class AudioRecorder:
                 audio = AudioSegment.from_wav(self.filename)
                 play(audio)
             threading.Thread(target=_play, daemon=True).start()
+
+    def delete_recording(self):
+        if self.filename and os.path.exists(self.filename):
+            os.remove(self.filename)
 
     def is_recording(self):
         return self._is_recording
@@ -38,11 +47,6 @@ class AudioRecorder:
 
     def record_audio(self):
         """Prepare recording"""
-        FORMAT = pyaudio.paInt16
-        CHANNELS = 1
-        RATE = 44100
-        CHUNK = 1024
-
         stream = self.audio.open(
             format=FORMAT,
             channels=CHANNELS,
