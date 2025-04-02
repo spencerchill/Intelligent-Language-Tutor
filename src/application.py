@@ -3,179 +3,184 @@ from text_gen import gen_random_text
 import text_processing as tp
 import error_detection as ed
 import models as md
-import string # punctuation removal
-#recording imports
+import string  # punctuation removal
+import os
 import pyaudio
 import wave
 import threading
-import os
+from gtts import gTTS
+from pydub import AudioSegment
+from pydub.playback import play
 
-# TODO: clean code structure up and make app look pretty like my mom :)
-# TODO: remove audio file after user goes to new phrase
-# TODO: record button is green after user stops recording. Reset it to white.
-# TODO: highlight incorrect phonemes in phoneme label (i might do this one)
-# TODO: add the ability to listen to your own recording
-# TODO: add the ability to listen to TTS of target_phrase
-# IMPORTANT: I stripped the target phrase of punctuations for error detection.
-#             we can add this back when we find a way to handle it
-#             probably involves kepping track of punctuation indices.
+# Constants for audio recording
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
+CHUNK = 1024
 
 class Application:
-   def __init__(self):
-       pass
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("ILT - Pronunciation Trainer")
+        self.root.geometry("800x600")
+        self.root.configure(bg="white")
 
-   def app(self):
-       # Constants for audio recording
-       FORMAT = pyaudio.paInt16 
-       CHANNELS = 1 
-       RATE = 44100 
-       CHUNK = 1024 
-       i = 1
-       OUTPUT_FILENAME = (f"ILT_Audio{i}.wav")
-       # Recording state variables
-       global is_recording
-       is_recording = False
-       frames = []
-       audio = pyaudio.PyAudio()
-       stream = None  # Define the stream globally to avoid scope issues
+        # Recording state variables
+        self.is_recording = False
+        self.frames = []
+        self.audio = pyaudio.PyAudio()
+        self.stream = None
+        self.audio_filename = None
 
-       def record_audio():
-           """ Function to record audio in a separate thread """
-           global is_recording, frames, stream
-           stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE,
-                               input=True, frames_per_buffer=CHUNK)
-           frames = []
-           print("Recording started...")
-         
-           while is_recording:
-               try:
-                   data = stream.read(CHUNK)
-                   frames.append(data)
-               except Exception as e:
-                   print(f"Error recording audio: {e}")
-                   break
-           print("Recording stopped.")
-           # Stop and close the stream
-           stream.stop_stream()
-           stream.close()
+        # Generate initial text and phoneme
+        self.current_text = self.generate_text()
+        self.current_phoneme = tp.text_to_ipa_phoneme(self.current_text)
 
-           exists = True
-           i = 1
-           while exists:
-               if os.path.exists(f"ILT_Audio{i}.wav"):
-                   i += 1
-               else:
-                   OUTPUT_FILENAME = (f"ILT_Audio{i}.wav")
-                   exists = False
-           # Save the recording to a WAV file
-           with wave.open(OUTPUT_FILENAME, 'wb') as wf:
-               wf.setnchannels(CHANNELS)
-               wf.setsampwidth(audio.get_sample_size(FORMAT))
-               wf.setframerate(RATE)
-               wf.writeframes(b''.join(frames))
+        # UI Components
+        self.create_widgets()
 
-           print(f"Audio file saved as {OUTPUT_FILENAME}")
-           # process audio now that recording is stopped
-           threading.Thread(target=process_audio, args=(OUTPUT_FILENAME,), daemon=True).start()
-     
-       def highlight_text(incorrect_indices, total_length):
-           """Highlight incorrect letters in the text"""
-           text_display.config(state="normal")
-           text_display.tag_remove("incorrect", "1.0", tk.END)  # previous highlights
-           text_display.tag_remove("correct", "1.0", tk.END)
+    def create_widgets(self):
+        """Create and arrange the UI components."""
 
+        # Text Display
+        self.text_display = tk.Text(self.root, font=("Arial", 14), wrap="word", width=40, height=4)
+        self.text_display.insert("1.0", self.current_text)
+        self.text_display.config(state="disabled")
+        self.text_display.tag_config("correct", foreground="green")
+        self.text_display.tag_config("incorrect", foreground="red")
+        self.text_display.pack(padx=20, pady=20)
 
-           text_display.tag_add("correct", "1.0", f"1.{total_length}") # entire text is green first
+        # Phoneme Label
+        self.phoneme_label = tk.Label(self.root, text=self.current_phoneme, font=("Arial", 12), fg="blue")
+        self.phoneme_label.pack(padx=20, pady=10)
 
+        # Buttons
+        self.rbtn = tk.Button(self.root, text="Start Recording", bg="white", command=self.toggle_recording)
+        self.rbtn.pack(padx=20, pady=10)
 
-           for index in incorrect_indices:
-               text_display.tag_add("incorrect", f"1.{index}", f"1.{index+1}")
+        self.play_btn = tk.Button(self.root, text="Play Recording", bg="lightgray", command=self.play_recording, state="disabled")
+        self.play_btn.pack(padx=20, pady=10)
 
+        self.tts_btn = tk.Button(self.root, text="Listen to TTS", bg="lightgray", command=self.play_tts)
+        self.tts_btn.pack(padx=20, pady=10)
 
-           text_display.config(state="disabled")
-         
-       def process_audio(filename):
-           """Analyze pronunciation from audio."""
-           print("Processing audio:", filename)
-           # convert speech to text
-           user_text = md.STTModel().transcribe(filename)
-           print("Transcription: ", user_text)
-           # convert text to phonemes
-           user_phonemes = tp.text_to_ipa_phoneme(user_text)
-           print("Phonemes: ", user_phonemes)
-           # get pronunciation info, such as accuracy and incorrect indices
-           error_info = ed.get_pronunciation_score(current_text, tp.text_to_ipa_phoneme(current_text), user_phonemes)
-           print("Pronunciation info:", error_info)
-         
-           highlight_text(error_info['incorrect_indices'], len(current_text))
+        self.generate_btn = tk.Button(self.root, text="Generate New Text", command=self.generate)
+        self.generate_btn.pack(padx=20, pady=20)
 
-       def toggle_recording():
-           """ Toggle the recording state when the button is pressed """
-           global is_recording
-           if not is_recording:
-               is_recording = True
-               rbtn.config(text="Stop Recording", bg="red")
-               # Start recording in a separate thread
-               threading.Thread(target=record_audio, daemon=True).start()
-         
-           else:
-               is_recording = False
-               rbtn.config(text="Start Recording", bg="green")
-       # GUI
-       root = tk.Tk()
-       root.configure(bg="white")
-       root.title("ILT")
-       root.geometry("800x600")
-       # my app looks awful on mac as colors are not standardized. feel free to delete when you set a style \
-       root.option_add('*Background', 'white')
-       root.option_add('*Foreground', 'black')
-       root.option_add('*TButton*Background', 'white')
-       root.option_add('*TButton*Foreground', 'white')
-       root.option_add('*TLabel*Background', 'white')
-       root.option_add('*TLabel*Foreground', 'black')
+    def generate_text(self):
+        """Generate a new phrase without punctuation for error detection."""
+        return ''.join([char for char in gen_random_text() if char not in string.punctuation])
 
-       # Initial Text and Phoneme Generation
-       # removing punctuation for error detection (working on it)
-       current_text = ''.join([char for char in gen_random_text() if char not in string.punctuation])
-       current_phoneme = tp.text_to_ipa_phoneme(current_text)
-       # Labels for Text and Phonemes
-       # changed textlabel to textdisplay for highlighting
-       # also keep style consistent pls
-       text_display = tk.Text(root, font=("Arial", 14), wrap="word", width=40, height=4) # change options how you see fit
-       text_display.insert("1.0", current_text)
-       text_display.config(state="disabled") 
-       text_display.tag_config("correct", foreground="green")
-       text_display.tag_config("incorrect", foreground="red")
-  
-       phoneme_label = tk.Label(root, text=current_phoneme, font=("Arial", 12), fg="blue")
-       #=currentPhoneme, font=("Arial", 12), fg="blue")
+    def generate(self):
+        """Generate new text, update UI, and remove old audio files."""
+        # Remove previous recording if exists
+        if self.audio_filename and os.path.exists(self.audio_filename):
+            os.remove(self.audio_filename)
 
-       def generate():
-           """Generates new text and updates both labels."""
-           nonlocal current_text  # Ensure we update the outer scope variable
-           # removing punctuation for error detection (working on it)
-           current_text = ''.join([char for char in gen_random_text() if char not in string.punctuation])
-           current_phoneme = tp.text_to_ipa_phoneme(current_text)
+        # Generate new text and phonemes
+        self.current_text = self.generate_text()
+        self.current_phoneme = tp.text_to_ipa_phoneme(self.current_text)
 
-           text_display.config(state="normal")
-           text_display.delete("1.0", tk.END)
-           text_display.insert("1.0", current_text)
-           text_display.config(state="disabled")
+        # Update UI
+        self.text_display.config(state="normal")
+        self.text_display.delete("1.0", tk.END)
+        self.text_display.insert("1.0", self.current_text)
+        self.text_display.config(state="disabled")
+        self.phoneme_label.config(text=self.current_phoneme)
 
-           phoneme_label.config(text=current_phoneme)
+        # Disable play button as there’s no new recording
+        self.play_btn.config(state="disabled", bg="lightgray")
 
-       # Buttons
-       rbtn = tk.Button(root, text="Start Recording", command=toggle_recording)
-       generate_btn = tk .Button(root, text="Generate New Text", command=generate)
+    def toggle_recording(self):
+        """Toggle the recording state."""
+        if not self.is_recording:
+            self.is_recording = True
+            self.rbtn.config(text="Stop Recording", bg="red")
+            threading.Thread(target=self.record_audio, daemon=True).start()
+        else:
+            self.is_recording = False
+            self.rbtn.config(text="Start Recording", bg="white")  # Reset color
 
-       # Layout
-       text_display.pack(padx=20, pady=20)
-       phoneme_label.pack(padx=20, pady=10, side="top")
-       generate_btn.pack(padx=20, pady=20, side="bottom")
-       rbtn.pack(padx=20, pady=20, side="bottom")
-      
-       root.mainloop()
+    def record_audio(self):
+        """Records the user's voice in a separate thread."""
+        self.frames = []
+        self.stream = self.audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+
+        print("Recording started...")
+        while self.is_recording:
+            try:
+                data = self.stream.read(CHUNK)
+                self.frames.append(data)
+            except Exception as e:
+                print(f"Error recording audio: {e}")
+                break
+        print("Recording stopped.")
+
+        # Close stream
+        self.stream.stop_stream()
+        self.stream.close()
+
+        # Save audio
+        self.audio_filename = "user_recording.wav"
+        with wave.open(self.audio_filename, 'wb') as wf:
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(self.audio.get_sample_size(FORMAT))
+            wf.setframerate(RATE)
+            wf.writeframes(b''.join(self.frames))
+
+        print(f"Audio file saved as {self.audio_filename}")
+        self.play_btn.config(state="normal", bg="white")  # Enable playback button
+
+        # Process pronunciation
+        threading.Thread(target=self.process_audio, args=(self.audio_filename,), daemon=True).start()
+
+    def process_audio(self, filename):
+        """Processes recorded audio and highlights incorrect phonemes."""
+        print("Processing audio:", filename)
+
+        # Convert speech to text
+        user_text = md.STTModel().transcribe(filename)
+        print("Transcription:", user_text)
+
+        # Convert text to phonemes
+        user_phonemes = tp.text_to_ipa_phoneme(user_text)
+        print("Phonemes:", user_phonemes)
+
+        # Get pronunciation info
+        error_info = ed.get_pronunciation_score(self.current_text, tp.text_to_ipa_phoneme(self.current_text), user_phonemes)
+        print("Pronunciation info:", error_info)
+
+        self.highlight_text(error_info['incorrect_indices'], len(self.current_text))
+
+    def highlight_text(self, incorrect_indices, total_length):
+        """Highlight incorrect letters in the text."""
+        self.text_display.config(state="normal")
+        self.text_display.tag_remove("incorrect", "1.0", tk.END)
+        self.text_display.tag_remove("correct", "1.0", tk.END)
+        self.text_display.tag_add("correct", "1.0", f"1.{total_length}")  # Initially mark all green
+
+        for index in incorrect_indices:
+            self.text_display.tag_add("incorrect", f"1.{index}", f"1.{index+1}")
+
+        self.text_display.config(state="disabled")
+
+    def play_recording(self):
+        """Play the last recorded audio file."""
+        if self.audio_filename and os.path.exists(self.audio_filename):
+            audio = AudioSegment.from_wav(self.audio_filename)
+            play(audio)
+
+    def play_tts(self):
+        """Generate and play TTS of the target phrase."""
+        tts_filename = "tts_output.mp3"
+        tts = gTTS(self.current_text)
+        tts.save(tts_filename)
+        os.system(tts_filename)  # Play the TTS audio
+
+    def run(self):
+        self.root.mainloop()
+
 
 if __name__ == "__main__":
-   app=Application()
-   app.app()
+    app = Application()
+    app.run()
