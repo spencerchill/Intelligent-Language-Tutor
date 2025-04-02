@@ -1,11 +1,27 @@
 import torch
 import sounddevice as sd
 import librosa 
-
+import threading
+from gtts import gTTS
+from pydub import AudioSegment
+from pydub.playback import play
+import os
 # currently reads audio file. ok for now
 def load_audio(audio_path, sample_rate):
     audio_input, sr = librosa.load(audio_path, sr=sample_rate)
     return audio_input
+
+def play_tts(text):
+    """Generate and play TTS of the target phrase."""
+    def _play():
+        tts_filename = "tts_output.mp3"
+        tts = gTTS(text)
+        tts.save(tts_filename)
+
+        audio = AudioSegment.from_file(tts_filename, format="mp3")
+        play(audio)
+
+    threading.Thread(target=_play, daemon=True).start() # avoid freezing main ui thread
 
 # Speech to text model 
 # perhaps looking into. Currently we have our phonemes not segmented (HARD?!)
@@ -35,8 +51,7 @@ class STTModel:
         transcription = self.processor.decode(predicted_ids[0])
 
         return transcription
-
-
+        
 class PhonemeModel:
     def __init__(self, model_name="Bluecast/wav2vec2-Phoneme", sample_rate=16000):
         from transformers import AutoProcessor, AutoModelForCTC

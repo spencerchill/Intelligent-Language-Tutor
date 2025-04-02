@@ -7,10 +7,10 @@ import eng_to_ipa as ipa
 
 # dont delete this pls
 def text_to_phoneme(text):
-     g2p = G2p()
-     phonemes = g2p(text)
-     #remove stress markers of phonetic representation
-     return [re.sub(r'\d+', '', phoneme) for phoneme in phonemes]
+    g2p = G2p()
+    phonemes = g2p(text)
+    #remove stress markers of phonetic representation
+    return [re.sub(r'\d+', '', phoneme) for phoneme in phonemes]
 
 def text_to_ipa_phoneme(text):
     ipa_transcription = ipa.convert(text)
