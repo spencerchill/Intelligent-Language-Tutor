@@ -12,7 +12,7 @@ def text_to_phoneme(text):
     #remove stress markers of phonetic representation
     return [re.sub(r'\d+', '', phoneme) for phoneme in phonemes]
 
-arpabet_to_ipa = {
+ARPA_TO_IPA = {
     "AA": "ɑ", "AE": "æ", "AH": "ʌ", "AO": "ɔ", "AW": "aʊ", "AY": "aɪ",
     "B": "b", "CH": "tʃ", "D": "d", "DH": "ð", "EH": "ɛ", "ER": "ɝ",
     "EY": "eɪ", "F": "f", "G": "ɡ", "HH": "h", "IH": "ɪ", "IY": "i",
@@ -21,6 +21,8 @@ arpabet_to_ipa = {
     "T": "t", "TH": "θ", "UH": "ʊ", "UW": "u", "V": "v", "W": "w",
     "Y": "j", "Z": "z", "ZH": "ʒ"
 }
+
+
 def text_to_ipa_phoneme(text):
     g2p = G2p()
     words = text.strip().split()
@@ -30,12 +32,12 @@ def text_to_ipa_phoneme(text):
         ipa = []
         for phoneme in arpabet:
             phoneme_clean = re.sub(r'\d', '', phoneme)
-            if phoneme_clean in arpabet_to_ipa:
-                ipa.append(arpabet_to_ipa[phoneme_clean])
-        ipa_words.append(''.join(ipa))
-    return f"/{' '.join(ipa_words)}/"
+            if phoneme_clean in ARPA_TO_IPA:
+                ipa.append(ARPA_TO_IPA[phoneme_clean])
+        ipa_words.append(ipa)  
+    return [phoneme for word in ipa_words for phoneme in word + [' ']][:-1] 
 
 if __name__ == "__main__":
-    text = "he doesn't know"    
+    text = "nice to meet you"    
     phoneme_output = text_to_ipa_phoneme(text)
-    print("IPA:", phoneme_output)
+    print("IPA:", ''.join(phoneme_output))
