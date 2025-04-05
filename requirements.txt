@@ -6,3 +6,7 @@ pathlib
 g2p_en
 eng-to-ipa
 pyaudio
+pydub
+gtts
+panphon
+

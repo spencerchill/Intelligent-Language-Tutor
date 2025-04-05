@@ -1,5 +1,7 @@
 import numpy as np
-import text_processing as tp
+from panphon.distance import Distance
+# threshold which phonemes are considered slightly mispronounced
+COST_THRESHOLD = 0.09
 # phoneme to character mapping
 # we can change these mappings to ipa and this code works fine. its up to you guys
 PHONEME_MAPPINGS = {
@@ -55,7 +57,7 @@ def levenshtein_indices(target_phonemes, user_phonemes):
             )
    # backtracking dp
     i, j = m, n
-    mispronounced_indices = set()  
+    mispronounced_indices = {} 
     while i > 0 or j > 0:
         if target_phonemes[i - 1] == user_phonemes[j - 1]: 
             # match
@@ -63,20 +65,23 @@ def levenshtein_indices(target_phonemes, user_phonemes):
             j -= 1
         elif dp[i][j] == dp[i - 1][j] + 1: 
             # Deletion (missing phoneme)
-            mispronounced_indices.add(i - 1)
+            mispronounced_indices[i - 1] = "full"
             i -= 1
         elif dp[i][j] == dp[i][j - 1] + 1: 
             # insertion (extra phoneme)
             # highlight phoneme before and after if they exist
-            mispronounced_indices.add(i - 1)
+            mispronounced_indices[i - 1] = "full"
             if i < m:
-                mispronounced_indices.add(i)
+                mispronounced_indices[i] = "full"
             j -= 1
         else: 
             # substitution
-            mispronounced_indices.add(i - 1)
+            cost = Distance().feature_edit_distance(target_phonemes[i - 1], user_phonemes[j - 1])
+            severity = 'slight' if cost <= COST_THRESHOLD else 'full'
+            mispronounced_indices[i-1] = severity
             i -= 1
             j -= 1
+
     return mispronounced_indices
 
 def create_phoneme_to_char_mapping(word, phonemes):
@@ -87,14 +92,17 @@ def create_phoneme_to_char_mapping(word, phonemes):
     mapping = []
     char_index = 0
     phoneme_index = 0
- 
+    phonemes_seen = set() 
+
     while phoneme_index < len(phonemes) and char_index < len(word):
         phoneme = phonemes[phoneme_index]
-        char_count = PHONEME_MAPPINGS.get(phoneme, 1)
+        char_count = IPA_MAPPINGS.get(phoneme, 1)
   
         # add mappings for each character this phoneme represents
-        for i in range(char_count):
-            mapping.append((phoneme_index, char_index + i))
+        if phoneme not in phonemes_seen:
+            for i in range(char_count):
+                mapping.append((phoneme_index, char_index + i))
+            phonemes_seen.add(phoneme)
         #go next char and phone
         char_index += char_count
         phoneme_index += 1
@@ -121,11 +129,11 @@ def get_pronunciation_score(target_phrase, target_phonemes, user_phonemes):
     target_words = split_phonemes(target_phonemes)
     user_words = split_phonemes(user_phonemes)
     original_words = target_phrase.split()
- 
     error_info = {
         'accuracy': 0, # lazy attempt at accuracy, change later with LEVENSTEHINENGS
         'incorrect_indices': [],
-        'word_feedback': [] # stores word and any of its errors. honestly remove this later i think (DEBUGGING)
+        'phoneme_indices': [],
+        'word_feedback': [] # stores mispronounced words and their errors, VISUALLFEEDBACK
     }
     total_phonemes = 0
     correct_phonemes = 0
@@ -134,41 +142,60 @@ def get_pronunciation_score(target_phrase, target_phonemes, user_phonemes):
         target_word = target_words[i]
         user_word = user_words[i]
         original_word = original_words[i]
+        
+        # check if words match exactly first
+        if target_word == user_word:
+            correct_phonemes += len(target_word)
+            total_phonemes += len(target_word)
+            continue
         # get indices of phonemes that are substitutions/deletions/insertions
-        mispronounced_indices = levenshtein_indices(target_word, user_word)
+        mispronounced_dict = levenshtein_indices(target_word, user_word)
         # create mapping from phoneme indices to character indices
         phoneme_to_char = create_phoneme_to_char_mapping(original_word, target_word)
-
+    
+        # Position of phoneme within larger context
         word_start = len(' '.join(original_words[:i])) + (i > 0)
-        word_mistakes = []
+        word_errors = []
+        seen_phonemes = set() 
+
         for phoneme_idx, char_idx in phoneme_to_char:
-            if phoneme_idx in mispronounced_indices:
-                # with levensthien we could have partial mispronounciations
-                # we could highlight those yellow but this is future
-                error_info['incorrect_indices'].append(word_start + char_idx)
-                word_mistakes.append(target_word[phoneme_idx])
-        # may delete word feedback
-        error_info['word_feedback'].append({
+            severity = mispronounced_dict.get(phoneme_idx)
+            if severity:
+                print(user_word)
+                # severity is either partial or full
+                error_info['incorrect_indices'].append((word_start + char_idx, severity))
+                error_info['phoneme_indices'].append((i, phoneme_idx, severity))
+                phoneme = target_word[phoneme_idx]
+                if phoneme not in seen_phonemes:  # prevent multiple phonemes in word_feedback
+                    word_errors.append({
+                        'phoneme': phoneme,
+                        'severity': severity
+                    })
+                    seen_phonemes.add(phoneme)
+        # jayden use this for future idea yk what it is KEEP
+        if word_errors:
+            error_info['word_feedback'].append({
             'word': original_word,
-            'errors': word_mistakes
-        })   
+            'errors': word_errors
+        })
         total_phonemes += len(target_word)
-        correct_phonemes += len(target_word) - len(mispronounced_indices)
+        correct_phonemes += len(target_word) - len(mispronounced_dict)
 
     if total_phonemes > 0:
         error_info['accuracy'] = (correct_phonemes / total_phonemes) * 100
- 
     return error_info
 
 def main():
     # Example usage
-    target_phrase = "the air"
-    target_phonemes = tp.text_to_phoneme(target_phrase)
-    user_phonemes = ['D', 'AH', ' ', 'EH', 'R']
+    import text_processing as tp
+    target_phrase = "At that moment there"
+    user_phrase = "At dat moment there"
+    target_phonemes = tp.text_to_ipa_phoneme(target_phrase)
+    user_phonemes = tp.text_to_ipa_phoneme(user_phrase)
+
  
     feedback = get_pronunciation_score(target_phrase, target_phonemes, user_phonemes)
     print("Pronunciation Feedback:", feedback)
-    print(target_phonemes)
 
 if __name__ == "__main__":
     main()

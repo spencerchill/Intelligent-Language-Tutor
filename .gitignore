@@ -36,6 +36,12 @@ MANIFEST
 *.manifest
 *.spec
 
+# Ignore audio files
+*.wav
+*.mp3
+*.flac
+*.ogg
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
