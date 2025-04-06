@@ -34,8 +34,18 @@ IPA_MAPPINGS = {
 
 def levenshtein_indices(target_phonemes, user_phonemes):
     """
-    Levenshteinn distance algorithm.
-    Returns mispronounced indices.
+    Calculates the Levenshtein distance between the target and user phonemes,
+    identifies mispronounced indices.
+    
+    Args:
+    -----
+        target_phonemes (list): List of target phonemes (e.g., ['ð', 'ə'])
+        user_phonemes (list): List of user-produced phonemes (e.g., ['d', 'ə'])
+        
+    Returns:
+    --------
+        dict: Dictionary mapping indices of mispronounced phonemes to severity ('slight' or 'full')
+             e.g., {0: 'full', 2: 'slight'}
     """
    # TODO: better scoring metrics which are not being calculated now
     m, n = len(target_phonemes), len(user_phonemes)
@@ -81,13 +91,23 @@ def levenshtein_indices(target_phonemes, user_phonemes):
             mispronounced_indices[i-1] = severity
             i -= 1
             j -= 1
-
+    print(mispronounced_indices)
     return mispronounced_indices
 
 def create_phoneme_to_char_mapping(word, phonemes):
     """
-    Create a mapping from phoneme indices to character indices using PHONEME_MAPPINGS.  
-    Returns a list of tuples (phoneme_index, char_index) for each phoneme.
+    Create a mapping from phoneme indices to character indices within word.  
+    
+    Args:
+    -----
+        word (str): The original word (e.g., "the")
+        phonemes (list): List of phonemes for the word (e.g., ['ð', 'ə'])
+        
+    Returns:
+    --------
+        list: List of tuples (phoneme_index, char_index) mapping phoneme positions 
+              to character positions in the original word.
+              e.g., [(0, 0), (0, 1), (1, 2)]
     """
     mapping = []
     char_index = 0
@@ -107,6 +127,19 @@ def create_phoneme_to_char_mapping(word, phonemes):
     return mapping
 
 def split_phonemes(phonemes):
+    """
+    Split a list of phonemes into words based on spaces.
+    
+    Args:
+    -----
+        phonemes (list): List of phonemes with spaces between words
+                         e.g., ['ð', 'ə', ' ', 'k', 'æ', 't']
+                         
+    Returns:
+    --------
+        list: List of phoneme lists, where each sublist corresponds to a word
+              e.g., [['ð', 'ə'], ['k', 'æ', 't']]
+    """
     words = []
     current_word = []
     for phoneme in phonemes:
@@ -121,9 +154,25 @@ def split_phonemes(phonemes):
 def get_pronunciation_score(target_phrase, target_phonemes, user_phonemes):
     """
     Get pronunciation score and error info for a target phrase and user phonemes.
-    ISSUE: MISMATCH OF NUMBER OF WORDS
-    USER MUST SPEAK SLOW CURRENTLY
-    """   
+    
+    Args:
+    -----
+        target_phrase (str): Original text phrase (e.g., "the cat")
+        target_phonemes (list): List of target IPA phonemes with spaces (e.g., ['ð', 'ə', ' ', 'k', 'æ', 't'])
+        user_phonemes (list): List of user's spoken IPA phonemes with spaces (e.g., ['d', 'ə', ' ', 'k', 'æ', 't'])
+        
+    Returns:
+    --------
+        dict: Dictionary containing:
+            - accuracy (float): Simplistic pronunciation accuracy percentage
+            - incorrect_indices (list): List of tuples (char_index, severity) for mispronounced characters
+            - phoneme_indices (list): List of tuples (word_index, phoneme_index, severity) for mispronounced phonemes
+            - word_feedback (list): Detailed information about mispronounced words such as:
+                    * incorrect word
+                    * start and end position of incorrect word
+                    * incorrect phonemes within word, corresponding character index, and severity
+    """
+
     target_words = split_phonemes(target_phonemes)
     user_words = split_phonemes(user_phonemes)
     original_words = target_phrase.split()
@@ -189,10 +238,12 @@ def get_pronunciation_score(target_phrase, target_phonemes, user_phonemes):
 
 
 def main():
-    # Example usage
+    """
+    Example usage
+    """
     import text_processing as tp
-    target_phrase = "the"
-    user_phrase = "duh"
+    target_phrase = "the cat"
+    user_phrase = "duh cat"
     target_phonemes = tp.text_to_ipa_phoneme(target_phrase)
     user_phonemes = tp.text_to_ipa_phoneme(user_phrase)
 
