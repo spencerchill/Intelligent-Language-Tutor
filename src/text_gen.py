@@ -16,11 +16,7 @@ def gen_random_text(file_path=FILE_PATH):
         random_sentence = random.choice(sentences)
         # remove punctuation
         return random_sentence.translate(str.maketrans("", "", ".,")) 
-# error handling for now
-    except FileNotFoundError as e:
-        print(f"{file_path} does not exist")
-    except json.JSONDecodeError as e:
-        print(f"failed decoding json file at {file_path}")
+        
     except Exception as e:
         print(f"Error: {str(e)}")
 

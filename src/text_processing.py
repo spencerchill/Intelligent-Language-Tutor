@@ -24,20 +24,19 @@ ARPA_TO_IPA = {
 
 
 def text_to_ipa_phoneme(text):
-    g2p = G2p()
-    words = text.strip().split()
-    ipa_words = []
-    for word in words:
-        arpabet = g2p(word)
-        ipa = []
-        for phoneme in arpabet:
-            phoneme_clean = re.sub(r'\d', '', phoneme)
-            if phoneme_clean in ARPA_TO_IPA:
-                ipa.append(ARPA_TO_IPA[phoneme_clean])
-        ipa_words.append(ipa)  
-    return [phoneme for word in ipa_words for phoneme in word + [' ']][:-1] 
+    arpabet_phonemes = text_to_phoneme(text)
+    # convert to IPA
+    ipa_phonemes = []
+    for phoneme in arpabet_phonemes:
+        if phoneme in ARPA_TO_IPA:
+            ipa_phonemes.append(ARPA_TO_IPA[phoneme])
+        elif phoneme == ' ':
+            ipa_phonemes.append(' ')
+
+    return ipa_phonemes
+ 
 
 if __name__ == "__main__":
     text = "nice to meet you"    
     phoneme_output = text_to_ipa_phoneme(text)
-    print("IPA:", ''.join(phoneme_output))
+    print("IPA:", phoneme_output)
