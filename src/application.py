@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from text_gen import gen_random_text
 import text_processing as tp
 import error_detection as ed
@@ -8,17 +9,18 @@ from audio_recorder import AudioRecorder
 
 class Application:
     def __init__(self):
+
+        self.background = "#111111"
+        self.box_color = "#222222"
+        self.title_font = "Lora 20 bold"
+        self.font = "Lora 16"
+
+        # Defining Root
         self.root = tk.Tk()
-        self.root.title("ILT - Pronunciation Trainer")
+        self.root.configure(bg=self.background)
+        self.root.title("Language Tutor")
         self.root.geometry("800x600")
-        self.root.configure(bg="white")
-        # my app looks awful on mac as colors are not standardized. feel free to delete when you set a style \
-        self.root.option_add("*Background", "white")
-        self.root.option_add("*Foreground", "black")
-        self.root.option_add("*TButton*Background", "white")
-        self.root.option_add("*TButton*Foreground", "white")
-        self.root.option_add("*TLabel*Background", "white")
-        self.root.option_add("*TLabel*Foreground", "black")
+
         # Initialize recorder
         self.recorder = AudioRecorder(callback=self.process_audio)
         # Generate initial text and phoneme
@@ -31,37 +33,198 @@ class Application:
 
     def create_widgets(self):
         """Create and arrange the UI components."""
-        # current text display
-        self.text_display = tk.Text(self.root, font=("Arial", 14), wrap="word", width=40, height=4)
+
+        #Title Canvas
+
+        self.title_canvas = tk.Canvas(self.root, width=700, height=60, 
+                                      borderwidth=0, highlightthickness=0, bg=self.background)
+        self.title_canvas.pack(pady=30)
+
+        def round_rectangle(x1, y1, x2, y2, radius=25, **kwargs):
+            
+            points = [x1+radius, y1,
+                        x1+radius, y1,
+                        x2-radius, y1,
+                        x2-radius, y1,
+                        x2, y1,
+                        x2, y1+radius,
+                        x2, y1+radius,
+                        x2, y2-radius,
+                        x2, y2-radius,
+                        x2, y2,
+                        x2-radius, y2,
+                        x2-radius, y2,
+                        x1+radius, y2,
+                        x1+radius, y2,
+                        x1, y2,
+                        x1, y2-radius,
+                        x1, y2-radius,
+                        x1, y1+radius,
+                        x1, y1+radius,
+                        x1, y1]
+
+            return self.title_canvas.create_polygon(points, **kwargs, smooth=True)
+
+        my_rectangle = round_rectangle(0, 0, 700, 60, radius=40, fill=self.box_color)
+
+        self.title_canvas.create_text(350, 30, text="Language Tutor", font=self.title_font)
+
+        #Tab Bar Canvas
+
+        self.tab_bar_canvas = tk.Canvas(self.root, width=600, height=60, borderwidth=0, highlightthickness=0, bg=self.background)
+        self.tab_bar_canvas.pack(pady=0)
+
+        self.tab_bar_canvas.create_text(300, 30, text="Tab Bar", font=self.font)
+
+        #Gen Text Canvas
+
+        self.gen_text_canvas = tk.Canvas(self.root, width=600, height=100, borderwidth=0, 
+                                         highlightthickness=0, bg=self.background)
+        self.gen_text_canvas.pack(pady=0)
+
+            #Text Display
+        self.text_display = tk.Text(self.gen_text_canvas, font=self.font, 
+                                    wrap="word", width=40, height=4,
+                                    borderwidth=0, highlightthickness=0,
+                                    background=self.box_color)
         self.text_display.insert("1.0", self.current_text)
         self.text_display.config(state="disabled")
         self.text_display.tag_config("correct", foreground="green")
         self.text_display.tag_config("incorrect", foreground="red")
         self.text_display.tag_config("partial", foreground="orange")
-        self.text_display.pack(padx=20, pady=20)
         self.text_display.bind("<Button-1>", self.on_word_click)
 
-        # current phoneme display
-        self.phoneme_display = tk.Text(self.root, font=("Arial", 14), wrap="word", fg="blue", height=4, width=40)
+        def round_rectangle(x1, y1, x2, y2, radius=25, **kwargs):
+            
+            points = [x1+radius, y1,
+                        x1+radius, y1,
+                        x2-radius, y1,
+                        x2-radius, y1,
+                        x2, y1,
+                        x2, y1+radius,
+                        x2, y1+radius,
+                        x2, y2-radius,
+                        x2, y2-radius,
+                        x2, y2,
+                        x2-radius, y2,
+                        x2-radius, y2,
+                        x1+radius, y2,
+                        x1+radius, y2,
+                        x1, y2,
+                        x1, y2-radius,
+                        x1, y2-radius,
+                        x1, y1+radius,
+                        x1, y1+radius,
+                        x1, y1]
+
+            return self.gen_text_canvas.create_polygon(points, **kwargs, smooth=True)
+
+        my_rectangle = round_rectangle(0, 0, 600, 100, radius=40, fill=self.box_color)
+
+        self.gen_text_canvas.create_window(300, 50, window=self.text_display)
+
+        self.gen_play_image = tk.PhotoImage(file="images/play.png")
+
+        self.gen_play_button = tk.Button(self.root, image=self.gen_play_image, 
+                                      borderwidth=0, background=self.box_color, 
+                                      activebackground=self.box_color,
+                                      command=self.play_tts)
+        
+        self.gen_text_canvas.create_window(550, 50, window=self.gen_play_button)
+
+        #User Phoneme Canvas
+
+        self.user_phoneme_canvas = tk.Canvas(self.root, width=600, height=100, borderwidth=0, 
+                                             highlightthickness=0, bg=self.background)
+        self.user_phoneme_canvas.pack(pady=20)
+
+            #User Phoneme Display
+        self.phoneme_display = tk.Text(self.user_phoneme_canvas, font=self.font, wrap="word", 
+                                       fg="blue", height=4, width=40,
+                                       borderwidth=0, highlightthickness=0,
+                                       background=self.box_color)
         self.phoneme_display.insert("1.0", self.display_phoneme)
         self.phoneme_display.config(state="disabled")
         self.phoneme_display.tag_config("correct", foreground="green")
         self.phoneme_display.tag_config("incorrect", foreground="red")
         self.phoneme_display.tag_config("partial", foreground="orange")
-        self.phoneme_display.pack(padx=20, pady=10)
 
-        # buttons
-        self.rbtn = tk.Button(self.root, text="Start Recording", bg="white", command=self.toggle_recording)
-        self.rbtn.pack(padx=20, pady=10)
+        def round_rectangle(x1, y1, x2, y2, radius=25, **kwargs):
+            
+            points = [x1+radius, y1,
+                        x1+radius, y1,
+                        x2-radius, y1,
+                        x2-radius, y1,
+                        x2, y1,
+                        x2, y1+radius,
+                        x2, y1+radius,
+                        x2, y2-radius,
+                        x2, y2-radius,
+                        x2, y2,
+                        x2-radius, y2,
+                        x2-radius, y2,
+                        x1+radius, y2,
+                        x1+radius, y2,
+                        x1, y2,
+                        x1, y2-radius,
+                        x1, y2-radius,
+                        x1, y1+radius,
+                        x1, y1+radius,
+                        x1, y1]
 
-        self.play_btn = tk.Button(self.root, text="Play Recording", bg="lightgray", command=self.recorder.play_recording, state="disabled")
-        self.play_btn.pack(padx=20, pady=10)
+            return self.user_phoneme_canvas.create_polygon(points, **kwargs, smooth=True)
 
-        self.tts_btn = tk.Button(self.root, text="Listen to TTS", bg="lightgray", command=self.play_tts)
-        self.tts_btn.pack(padx=20, pady=10)
+        my_rectangle = round_rectangle(0, 0, 600, 100, radius=40, fill=self.box_color)
 
-        self.generate_btn = tk.Button(self.root, text="Generate New Text", command=self.generate)
-        self.generate_btn.pack(padx=20, pady=20)
+        self.user_phoneme_canvas.create_window(300, 50, window=self.phoneme_display)
+
+        self.user_play_image = tk.PhotoImage(file="images/play.png")
+
+        self.user_play_button = tk.Button(self.root, image=self.user_play_image, 
+                                      borderwidth=0, background=self.box_color, 
+                                      activebackground=self.box_color,
+                                      command=self.recorder.play_recording, state="disabled")
+        
+        self.user_phoneme_canvas.create_window(550, 50, 
+                                               window=self.user_play_button)
+
+        #Record Button Canvas
+
+        def rbtn_click():
+            print(self.rbtn.cget("image"))
+            if self.rbtn.cget("image") == "pyimage3":
+                self.rbtn.config(image=self.rbtn_red_image)
+            else:
+                self.rbtn.config(image=self.rbtn_green_image)
+
+        self.rbtn_canvas = tk.Canvas(self.root, width=50, height=50, borderwidth=0, 
+                                     highlightthickness=0, bg=self.background)
+        self.rbtn_canvas.pack(pady=0)
+
+        self.rbtn_green_image = tk.PhotoImage(file="images/rbtn_green.png")
+
+        self.rbtn_red_image = tk.PhotoImage(file="images/rbtn_red.png")
+
+        self.rbtn = tk.Button(self.rbtn_canvas, image=self.rbtn_green_image,
+                                      borderwidth=0, background=self.background, 
+                                      activebackground=self.background,
+                                      command=self.toggle_recording)
+        self.rbtn.pack()
+
+
+        #Check Button Canvas
+
+        self.check_canvas = tk.Canvas(self.root, width=50, height=50, borderwidth=0, 
+                                      highlightthickness=0, bg=self.background)
+        self.check_canvas.pack(pady=20)
+
+        self.check_image = tk.PhotoImage(file="images/check.png")
+
+        self.check_button = tk.Button(self.check_canvas, image=self.check_image,
+                                      borderwidth=0, background=self.background,
+                                      activebackground=self.background,
+                                      command=self.generate)
+        self.check_button.pack()
 
     def generate(self):
         """Generate new text, update UI, and remove old audio files."""
@@ -81,7 +244,7 @@ class Application:
         self.phoneme_display.insert("1.0", self.display_phoneme)
         self.phoneme_display.config(state="disabled")
         # Disable play button as there’s no new recording
-        self.play_btn.config(state="disabled", bg="lightgray")
+        self.user_play_button.config(state="disabled", bg="lightgray")
 
     def toggle_recording(self):
         """Toggle the recording state."""
@@ -91,7 +254,7 @@ class Application:
         else:
             self.recorder.stop_recording()
             self.rbtn.config(text="Start Recording", bg="white")  # Reset color
-            self.play_btn.config(state="normal", bg="white")
+            self.user_play_button.config(state="normal", bg="white")
 
     def process_audio(self, filename):
         """Processes recorded audio and highlights incorrect phonemes."""
