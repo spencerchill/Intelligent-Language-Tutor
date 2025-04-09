@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import ttk
 from text_gen import gen_random_text
 import text_processing as tp
 import error_detection as ed
@@ -10,10 +9,17 @@ from audio_recorder import AudioRecorder
 class Application:
     def __init__(self):
 
+        # Style Elements
         self.background = "#111111"
         self.box_color = "#222222"
         self.title_font = "Lora 20 bold"
         self.font = "Lora 16"
+        self.text_fill = "#ffffff"
+
+        # Tab Booleans
+        self.speech_enable = True
+        self.spectrogram_enable = False
+        self.ai_model_enable = False
 
         # Defining Root
         self.root = tk.Tk()
@@ -67,14 +73,30 @@ class Application:
 
         my_rectangle = round_rectangle(0, 0, 700, 60, radius=40, fill=self.box_color)
 
-        self.title_canvas.create_text(350, 30, text="Language Tutor", font=self.title_font)
+        self.title_canvas.create_text(350, 30, text="Language Tutor", font=self.title_font, 
+                                      fill=self.text_fill)
 
         #Tab Bar Canvas
 
         self.tab_bar_canvas = tk.Canvas(self.root, width=600, height=60, borderwidth=0, highlightthickness=0, bg=self.background)
         self.tab_bar_canvas.pack(pady=0)
 
-        self.tab_bar_canvas.create_text(300, 30, text="Tab Bar", font=self.font)
+        self.speech_btn = tk.Button(text="Speech", font=self.font, fg=self.text_fill,
+                                    borderwidth=0, highlightthickness=0, bg=self.background,
+                                    command=self.speech_click)
+        self.spectrogram_btn = tk.Button(text="Spectrogram", font=self.font, fg=self.text_fill,
+                                         borderwidth=0, highlightthickness=0, bg=self.background,
+                                         command=self.spectrogram_click)
+        self.ai_model_btn = tk.Button(text="AI Model", font=self.font, fg=self.text_fill,
+                                      borderwidth=0, highlightthickness=0, bg=self.background,
+                                      command=self.ai_model_click)
+
+        self.tab_bar_canvas.create_window(150, 30, window=self.speech_btn)
+        self.tab_bar_canvas.create_window(300, 30, window=self.spectrogram_btn)
+        self.tab_bar_canvas.create_window(450, 30, window=self.ai_model_btn)
+
+        self.tab_selected_bar = tk.PhotoImage(file="images/tab_bar.png")
+        self.tab_image_id = self.tab_bar_canvas.create_image(150, 50, image=self.tab_selected_bar)
 
         #Gen Text Canvas
 
@@ -190,13 +212,6 @@ class Application:
 
         #Record Button Canvas
 
-        def rbtn_click():
-            print(self.rbtn.cget("image"))
-            if self.rbtn.cget("image") == "pyimage3":
-                self.rbtn.config(image=self.rbtn_red_image)
-            else:
-                self.rbtn.config(image=self.rbtn_green_image)
-
         self.rbtn_canvas = tk.Canvas(self.root, width=50, height=50, borderwidth=0, 
                                      highlightthickness=0, bg=self.background)
         self.rbtn_canvas.pack(pady=0)
@@ -209,7 +224,7 @@ class Application:
                                       borderwidth=0, background=self.background, 
                                       activebackground=self.background,
                                       command=self.toggle_recording)
-        self.rbtn.pack()
+        self.rbtn_canvas.create_window(25, 25, window=self.rbtn)
 
 
         #Check Button Canvas
@@ -224,7 +239,90 @@ class Application:
                                       borderwidth=0, background=self.background,
                                       activebackground=self.background,
                                       command=self.generate)
-        self.check_button.pack()
+        self.check_canvas.create_window(25, 25, window=self.check_button)
+
+        # Spectrogram Canvas
+        self.spectrogram_canvas = tk.Canvas(self.root, width=100, height=100, borderwidth=0, 
+                                      highlightthickness=0, bg=self.background)
+        
+        self.spectrogram_canvas.create_text(50, 50, text="Spectrogram")
+
+        #AI Model Canvas
+        self.ai_model_canvas = tk.Canvas(self.root, width=100, height=100, borderwidth=0, 
+                                      highlightthickness=0, bg=self.background)
+        
+        self.ai_model_canvas.create_text(50, 50, text="AI Model")
+
+    # Tab Bar Methods
+    def speech_click(self):
+        if not self.speech_enable:
+
+            if self.spectrogram_enable:
+                self.tab_bar_canvas.move(self.tab_image_id, -150, 0)
+                self.disable_spectrogram_ui()
+            
+            if self.ai_model_enable:
+                self.tab_bar_canvas.move(self.tab_image_id, -300, 0)
+                self.disable_ai_model_ui()
+            
+            self.enable_speech_ui()
+
+    def spectrogram_click(self):
+        if not self.spectrogram_enable:
+
+            if self.speech_enable:
+                self.tab_bar_canvas.move(self.tab_image_id, 150, 0)
+                self.disable_speech_ui()
+
+            if self.ai_model_enable:
+                self.tab_bar_canvas.move(self.tab_image_id, -150, 0)
+                self.disable_ai_model_ui()
+            
+            self.enable_spectrogram_ui()
+
+    def ai_model_click(self):
+        if not self.ai_model_enable:
+            
+            if self.speech_enable:
+                self.tab_bar_canvas.move(self.tab_image_id, 300, 0)
+                self.disable_speech_ui()
+
+            if self.spectrogram_enable:
+                self.tab_bar_canvas.move(self.tab_image_id, 150, 0)
+                self.disable_spectrogram_ui()
+            
+            self.enable_ai_model_ui()
+
+    def enable_speech_ui(self):
+        self.speech_enable = True
+        self.gen_text_canvas.pack()
+        self.user_phoneme_canvas.pack(pady=20)
+        self.rbtn_canvas.pack()
+        self.check_canvas.pack(pady=20)
+
+    def disable_speech_ui(self):
+        self.speech_enable = False
+        self.gen_text_canvas.pack_forget()
+        self.user_phoneme_canvas.pack_forget()
+        self.rbtn_canvas.pack_forget()
+        self.check_canvas.pack_forget()
+
+    def enable_spectrogram_ui(self):
+        self.spectrogram_enable = True
+        self.spectrogram_canvas.pack()
+
+    def disable_spectrogram_ui(self):
+        self.spectrogram_enable = False
+        self.spectrogram_canvas.pack_forget()
+    
+    def enable_ai_model_ui(self):
+        self.ai_model_enable = True
+        self.ai_model_canvas.pack()
+    
+    def disable_ai_model_ui(self):
+        self.ai_model_enable = False
+        self.ai_model_canvas.pack_forget()
+
 
     def generate(self):
         """Generate new text, update UI, and remove old audio files."""
@@ -249,11 +347,11 @@ class Application:
     def toggle_recording(self):
         """Toggle the recording state."""
         if not self.recorder.is_recording():
-            self.rbtn.config(text="Stop Recording", bg="red")
+            self.rbtn.config(image=self.rbtn_red_image)
             self.recorder.start_recording()
         else:
             self.recorder.stop_recording()
-            self.rbtn.config(text="Start Recording", bg="white")  # Reset color
+            self.rbtn.config(image=self.rbtn_green_image)  # Reset color
             self.user_play_button.config(state="normal", bg="white")
 
     def process_audio(self, filename):
