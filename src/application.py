@@ -108,7 +108,8 @@ class Application:
         self.text_display = tk.Text(self.gen_text_canvas, font=self.font, 
                                     wrap="word", width=40, height=4,
                                     borderwidth=0, highlightthickness=0,
-                                    background=self.box_color)
+                                    background=self.box_color,
+                                    fg=self.text_fill)
         self.text_display.insert("1.0", self.current_text)
         self.text_display.config(state="disabled")
         self.text_display.tag_config("correct", foreground="green")
@@ -266,6 +267,7 @@ class Application:
                 self.disable_ai_model_ui()
             
             self.enable_speech_ui()
+            self.root.update()
 
     def spectrogram_click(self):
         if not self.spectrogram_enable:
@@ -279,6 +281,7 @@ class Application:
                 self.disable_ai_model_ui()
             
             self.enable_spectrogram_ui()
+            self.root.update()
 
     def ai_model_click(self):
         if not self.ai_model_enable:
@@ -292,6 +295,7 @@ class Application:
                 self.disable_spectrogram_ui()
             
             self.enable_ai_model_ui()
+            self.root.update()
 
     def enable_speech_ui(self):
         self.speech_enable = True
@@ -299,6 +303,7 @@ class Application:
         self.user_phoneme_canvas.pack(pady=20)
         self.rbtn_canvas.pack()
         self.check_canvas.pack(pady=20)
+        self.root.update()
 
     def disable_speech_ui(self):
         self.speech_enable = False
@@ -306,22 +311,27 @@ class Application:
         self.user_phoneme_canvas.pack_forget()
         self.rbtn_canvas.pack_forget()
         self.check_canvas.pack_forget()
+        self.root.update()
 
     def enable_spectrogram_ui(self):
         self.spectrogram_enable = True
         self.spectrogram_canvas.pack()
+        self.root.update()
 
     def disable_spectrogram_ui(self):
         self.spectrogram_enable = False
         self.spectrogram_canvas.pack_forget()
+        self.root.update()
     
     def enable_ai_model_ui(self):
         self.ai_model_enable = True
         self.ai_model_canvas.pack()
+        self.root.update()
     
     def disable_ai_model_ui(self):
         self.ai_model_enable = False
         self.ai_model_canvas.pack_forget()
+        self.root.update()
 
 
     def generate(self):
