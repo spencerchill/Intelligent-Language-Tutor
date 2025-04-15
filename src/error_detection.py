@@ -1,5 +1,9 @@
 import numpy as np
 from panphon.distance import Distance
+import panphon.featuretable
+# magic to default panphon to utf-8 encoding
+# else it wont work on windows
+panphon.featuretable.open = lambda fn, *args, **kwargs: open(fn, *args, encoding='utf-8', **kwargs)
 # threshold which phonemes are considered slightly mispronounced
 COST_THRESHOLD = 0.09
 
