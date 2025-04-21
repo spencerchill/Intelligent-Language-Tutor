@@ -4,6 +4,9 @@ import text_processing as tp
 import error_detection as ed
 import models as md
 from audio_recorder import AudioRecorder
+import matplotlib.pyplot as plt
+from scipy.io import wavfile
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class Application:
@@ -254,6 +257,37 @@ class Application:
         
         self.ai_model_canvas.create_text(50, 50, text="AI Model")
 
+    def show_spectrogram(self):
+        filename = "user_recording.wav"
+        if not filename:
+            print("No recording available.")
+            return
+
+        try:
+            # Read audio
+            rate, data = wavfile.read(filename)
+
+            # Clear previous plot if needed
+            for widget in self.spectrogram_canvas.winfo_children():
+                widget.destroy()
+
+            # Plot spectrogram
+            fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
+            ax.specgram(data, Fs=rate, NFFT=1024, noverlap=512, cmap="inferno")
+            ax.set_title("Spectrogram")
+            ax.set_xlabel("Time")
+            ax.set_ylabel("Frequency")
+            fig.tight_layout()
+
+            # Embed matplotlib figure into Tkinter canvas
+            canvas = FigureCanvasTkAgg(fig, master=self.spectrogram_canvas)
+            canvas.draw()
+            canvas_widget = canvas.get_tk_widget()
+            canvas_widget.pack()
+
+        except Exception as e:
+            print("Error generating spectrogram:", e)
+
     # Tab Bar Methods
     def speech_click(self):
         if not self.speech_enable:
@@ -316,6 +350,7 @@ class Application:
     def enable_spectrogram_ui(self):
         self.spectrogram_enable = True
         self.spectrogram_canvas.pack()
+        self.show_spectrogram()
         self.root.update()
 
     def disable_spectrogram_ui(self):
