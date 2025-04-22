@@ -127,6 +127,31 @@ class Application:
         self.text_display.tag_config("partial", foreground="orange")
         self.text_display.bind("<Button-1>", self.on_word_click)
 
+        def round_rectangle(x1, y1, x2, y2, radius=25, **kwargs):
+            
+            points = [x1+radius, y1,
+                        x1+radius, y1,
+                        x2-radius, y1,
+                        x2-radius, y1,
+                        x2, y1,
+                        x2, y1+radius,
+                        x2, y1+radius,
+                        x2, y2-radius,
+                        x2, y2-radius,
+                        x2, y2,
+                        x2-radius, y2,
+                        x2-radius, y2,
+                        x1+radius, y2,
+                        x1+radius, y2,
+                        x1, y2,
+                        x1, y2-radius,
+                        x1, y2-radius,
+                        x1, y1+radius,
+                        x1, y1+radius,
+                        x1, y1]
+
+            return self.gen_text_canvas.create_polygon(points, **kwargs, smooth=True)
+        
         my_rectangle = round_rectangle(0, 0, 600, 100, radius=40, fill=self.box_color)
 
         self.gen_text_canvas.create_window(300, 50, window=self.text_display)
@@ -158,6 +183,31 @@ class Application:
         self.phoneme_display.tag_config("incorrect", foreground="red")
         self.phoneme_display.tag_config("partial", foreground="orange")
 
+        def round_rectangle(x1, y1, x2, y2, radius=25, **kwargs):
+            
+            points = [x1+radius, y1,
+                        x1+radius, y1,
+                        x2-radius, y1,
+                        x2-radius, y1,
+                        x2, y1,
+                        x2, y1+radius,
+                        x2, y1+radius,
+                        x2, y2-radius,
+                        x2, y2-radius,
+                        x2, y2,
+                        x2-radius, y2,
+                        x2-radius, y2,
+                        x1+radius, y2,
+                        x1+radius, y2,
+                        x1, y2,
+                        x1, y2-radius,
+                        x1, y2-radius,
+                        x1, y1+radius,
+                        x1, y1+radius,
+                        x1, y1]
+
+            return self.user_phoneme_canvas.create_polygon(points, **kwargs, smooth=True)
+            
         my_rectangle = round_rectangle(0, 0, 600, 100, radius=40, fill=self.box_color)
 
         self.user_phoneme_canvas.create_window(300, 50, window=self.phoneme_display)
