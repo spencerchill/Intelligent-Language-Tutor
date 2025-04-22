@@ -4,9 +4,13 @@ import text_processing as tp
 import error_detection as ed
 import models as md
 from audio_recorder import AudioRecorder
+
 import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+
+from pronunciation_panel import PronunciationPanel
 
 
 class Application:
@@ -36,13 +40,15 @@ class Application:
         self.current_text = gen_random_text()
         self.current_phoneme = tp.text_to_ipa_phoneme(self.current_text)
         self.display_phoneme = ''.join(self.current_phoneme)
+
+        self.model = md.STTModel()
         self.error_info = None
+        self.panel = PronunciationPanel(self.root, tts_callback=self.play_tts)
         # UI Components
         self.create_widgets()
 
     def create_widgets(self):
         """Create and arrange the UI components."""
-
         #Title Canvas
 
         self.title_canvas = tk.Canvas(self.root, width=700, height=60, 
@@ -113,37 +119,13 @@ class Application:
                                     borderwidth=0, highlightthickness=0,
                                     background=self.box_color,
                                     fg=self.text_fill)
+
         self.text_display.insert("1.0", self.current_text)
         self.text_display.config(state="disabled")
         self.text_display.tag_config("correct", foreground="green")
         self.text_display.tag_config("incorrect", foreground="red")
         self.text_display.tag_config("partial", foreground="orange")
         self.text_display.bind("<Button-1>", self.on_word_click)
-
-        def round_rectangle(x1, y1, x2, y2, radius=25, **kwargs):
-            
-            points = [x1+radius, y1,
-                        x1+radius, y1,
-                        x2-radius, y1,
-                        x2-radius, y1,
-                        x2, y1,
-                        x2, y1+radius,
-                        x2, y1+radius,
-                        x2, y2-radius,
-                        x2, y2-radius,
-                        x2, y2,
-                        x2-radius, y2,
-                        x2-radius, y2,
-                        x1+radius, y2,
-                        x1+radius, y2,
-                        x1, y2,
-                        x1, y2-radius,
-                        x1, y2-radius,
-                        x1, y1+radius,
-                        x1, y1+radius,
-                        x1, y1]
-
-            return self.gen_text_canvas.create_polygon(points, **kwargs, smooth=True)
 
         my_rectangle = round_rectangle(0, 0, 600, 100, radius=40, fill=self.box_color)
 
@@ -169,36 +151,12 @@ class Application:
                                        fg="blue", height=4, width=40,
                                        borderwidth=0, highlightthickness=0,
                                        background=self.box_color)
+
         self.phoneme_display.insert("1.0", self.display_phoneme)
         self.phoneme_display.config(state="disabled")
         self.phoneme_display.tag_config("correct", foreground="green")
         self.phoneme_display.tag_config("incorrect", foreground="red")
         self.phoneme_display.tag_config("partial", foreground="orange")
-
-        def round_rectangle(x1, y1, x2, y2, radius=25, **kwargs):
-            
-            points = [x1+radius, y1,
-                        x1+radius, y1,
-                        x2-radius, y1,
-                        x2-radius, y1,
-                        x2, y1,
-                        x2, y1+radius,
-                        x2, y1+radius,
-                        x2, y2-radius,
-                        x2, y2-radius,
-                        x2, y2,
-                        x2-radius, y2,
-                        x2-radius, y2,
-                        x1+radius, y2,
-                        x1+radius, y2,
-                        x1, y2,
-                        x1, y2-radius,
-                        x1, y2-radius,
-                        x1, y1+radius,
-                        x1, y1+radius,
-                        x1, y1]
-
-            return self.user_phoneme_canvas.create_polygon(points, **kwargs, smooth=True)
 
         my_rectangle = round_rectangle(0, 0, 600, 100, radius=40, fill=self.box_color)
 
@@ -229,8 +187,7 @@ class Application:
                                       activebackground=self.background,
                                       command=self.toggle_recording)
         self.rbtn_canvas.create_window(25, 25, window=self.rbtn)
-
-
+    
         #Check Button Canvas
 
         self.check_canvas = tk.Canvas(self.root, width=50, height=50, borderwidth=0, 
@@ -266,6 +223,7 @@ class Application:
         try:
             # Read audio
             rate, data = wavfile.read(filename)
+
 
             # Clear previous plot if needed
             for widget in self.spectrogram_canvas.winfo_children():
@@ -403,110 +361,106 @@ class Application:
         """Processes recorded audio and highlights incorrect phonemes."""
         print("Processing audio:", filename)
 
-        user_text = md.STTModel().transcribe(filename)
-        print("Transcription:", user_text)
+        user_text = self.model.transcribe(filename)
+        # audio processing finished
+        print("User Transcription:", user_text)
     
         user_phonemes = tp.text_to_ipa_phoneme(user_text)
-        print("Phonemes:", user_phonemes)
+        print("User Phonemes:", user_phonemes)
         
         target_words = self.current_text.split()
         user_words = user_text.split()
 
-        # if user speaks too few or too many words program breaks. we probably wont fix this lol
-        if len(target_words) != len(user_words):
-            self.highlight_all_red(len(self.current_text))
-            return 
+        # basically user didnt even try. just highlight all wrong
+        if abs(len(user_words) - len(target_words)) > 4:
+            return self.highlight_all_red()
 
         self.error_info = ed.get_pronunciation_score(self.current_text, self.current_phoneme, user_phonemes)
-        # create section for accuracy later 
-        self.highlight_text(self.error_info['incorrect_indices'], len(self.current_text))
-        self.highlight_phonemes(self.error_info['phoneme_indices'], len(self.display_phoneme))
-
-    def highlight_all_red(self, total_length):
-        """Highlight phonemes and text red."""
-        # should only be called due to issue with error detection
+        # TODO: please create section for accuracy later i have the error_info done for it just grab it
+        self.highlight_text(self.error_info['incorrect_indices'])
+        self.highlight_phonemes(self.error_info['phoneme_indices'])
+        
+    def highlight_all_red(self):
+        # should only be called if user doesnt even try. 
         self.text_display.config(state="normal")
         self.text_display.tag_remove("incorrect", "1.0", tk.END)
-        self.text_display.tag_add("incorrect", "1.0", f"1.{total_length}")
+        self.text_display.tag_add("incorrect", "1.0", tk.END)
         self.text_display.config(state="disabled")
 
         self.phoneme_display.config(state="normal")
         self.phoneme_display.tag_remove("incorrect", "1.0", tk.END)
-        self.phoneme_display.tag_add("incorrect", "1.0", f"1.{total_length}")
+        self.phoneme_display.tag_add("incorrect", "1.0", tk.END)
         self.phoneme_display.config(state="disabled")
-        
-    def highlight_phonemes(self, phoneme_indices, total_length):
-        # i thought this would be easy:(
+        # you can add more visual feedback if you want afterwards
+
+    def highlight_phonemes(self, phoneme_indices):
         self.phoneme_display.config(state="normal")
         self.phoneme_display.tag_remove("incorrect", "1.0", tk.END)
         self.phoneme_display.tag_remove("partial", "1.0", tk.END)
         self.phoneme_display.tag_remove("correct", "1.0", tk.END)
-        self.phoneme_display.tag_add("correct", "1.0", f"1.{total_length}")
+        self.phoneme_display.tag_add("correct", "1.0", tk.END)
 
-        phoneme_words = ed.split_phonemes(self.current_phoneme) 
-        # character position for each phoneme
-        char_positions = []
-        current_pos = 0
-        
-        for word in phoneme_words:
-            word_positions = []
-            for phoneme in word:
-                word_positions.append(current_pos)
-                # count the actual characters in the phoneme
-                current_pos += len(phoneme)
-            char_positions.append(word_positions)
-            current_pos += 1  # space between words
-        # highlighting
-        for word_idx, phoneme_idx, severity in phoneme_indices:
-            if word_idx < len(char_positions) and phoneme_idx < len(char_positions[word_idx]):
-                tag = "incorrect" if severity == "full" else "partial"
-                start_pos = char_positions[word_idx][phoneme_idx]
-                phoneme_length = len(phoneme_words[word_idx][phoneme_idx])
-                self.phoneme_display.tag_add(tag, f"1.{start_pos}", f"1.{start_pos + phoneme_length}")
+        for phoneme_idx, severity in phoneme_indices:
+            # need to know starting pos by adding num characters for each index upto current
+            # this is because phonemes are displayed as flat list and processed split
+            start_pos = sum(len(self.current_phoneme[i]) for i in range(phoneme_idx))
+            phoneme_length = len(self.current_phoneme[phoneme_idx])
+            self.phoneme_display.tag_add(severity, f"1.{start_pos}", f"1.{start_pos + phoneme_length}")
+
         self.phoneme_display.config(state="disabled")
 
-    def highlight_text(self, incorrect_indices, total_length):
-        """Highlight incorrect letters in the text"""
+    def highlight_text(self, incorrect_indices):
+        """Highlight incorrect letters in the text_display"""
         self.text_display.config(state="normal")
         self.text_display.tag_remove("incorrect", "1.0", tk.END)
         self.text_display.tag_remove("partial", "1.0", tk.END)
         self.text_display.tag_remove("correct", "1.0", tk.END)
-        self.text_display.tag_add("correct", "1.0", f"1.{total_length}")
+        self.text_display.tag_add("correct", "1.0", tk.END)
         # highlighting target_phrase
         for index, severity in incorrect_indices:
-            tag = "incorrect" if severity == "full" else "partial"
-            self.text_display.tag_add(tag, f"1.{index}", f"1.{index+1}")
+            self.text_display.tag_add(severity, f"1.{index}", f"1.{index+1}")
         self.text_display.config(state="disabled")
     
     def on_word_click(self, event):
+        # hide panel if already showing
+        if self.panel.is_visible:
+            self.panel.hide()
+            return
         index = self.text_display.index(f"@{event.x},{event.y}")
         word_start = self.text_display.index(f"{index} wordstart")
         word_end = self.text_display.index(f"{index} wordend")
         clicked_word = self.text_display.get(word_start, word_end).strip()
-        
-        if clicked_word:
-            print(word_start)
-            print(word_end)
-            print(self.get_clicked_word(word_start, word_end, clicked_word))
-    
-    def get_clicked_word(self, word_start, word_end, clicked_word):
-        if self.error_info == None:
-            # user hasnt processed audio yet diff logic tbd
-            return clicked_word
 
+        if clicked_word:
+            if self.error_info is None:
+                # user hasnt processed audio yet, just play the word
+                self.play_tts(clicked_word)
+                return
+            word_info = self.get_clicked_word_info(word_start, word_end, clicked_word)
+            #                          index for phoneme word
+            word, phonemes = word_info
+            # x y coord of cursor 
+            x = self.root.winfo_pointerx() - self.root.winfo_rootx()
+            y = self.root.winfo_pointery() - self.root.winfo_rooty()
+            self.panel.show(x, y, word, phonemes)
+
+    def get_clicked_word_info(self, word_start, word_end, clicked_word):
         start_index = int(word_start.split('.')[1])
         end_index = int(word_end.split('.')[1])
-        # iterate through the words in word_feedback and check for the clicked position
-        for word in self.error_info['word_feedback']:
-            if word['start_index'] <= start_index <= word['end_index'] and word['start_index'] <= end_index <= word['end_index']:
-                return word['word'], word['errors']
+        # get the word info for the word clicked
+        for word_feedback in self.error_info['word_feedback']:
+            if start_index <= word_feedback['char_start_index'] and \
+                end_index <= word_feedback['char_end_index']:
+                return word_feedback['word'], word_feedback['phonemes']
+        # if it reaches this i have failed you
+        return None
 
-    def play_tts(self):
-        md.play_tts(self.current_text)
+    def play_tts(self, text):
+        md.play_tts(text)
 
     def run(self):
         self.root.mainloop()
 
 if __name__ == "__main__":
-    app = Application()
-    app.run()
+   app = Application()
+   app.run()
