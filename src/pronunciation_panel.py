@@ -27,9 +27,9 @@ class PronunciationPanel:
         self.style.configure("ScrollIndicator.TLabel", background='#1e1e1e', foreground='#666666', font=("Inter", 10))
         
         # create main container with ttk
-        self.container = ttk.Frame(
-            parent, 
-            style="Dark.TFrame",
+        self.container = tk.Frame(
+            self.parent, 
+            bg='#1e1e1e',
             width=self.panel_width, 
             height=self.panel_height
         )
@@ -43,9 +43,9 @@ class PronunciationPanel:
         )
         self.border_frame.place(x=0, y=0)
         
-        self.inner_frame = ttk.Frame(
+        self.inner_frame = tk.Frame(
             self.border_frame,
-            style="Dark.TFrame",
+            bg="#1e1e1e",
             width=self.panel_width-2,
             height=self.panel_height-2
         )
@@ -59,18 +59,17 @@ class PronunciationPanel:
         self.parent.update_idletasks()
     
     def create_widgets(self):
-        self.top_frame = ttk.Frame(self.inner_frame, style="Dark.TFrame")
+        self.top_frame = tk.Frame(self.inner_frame,  bg='#1e1e1e')
         self.top_frame.pack(fill="x", pady=(15, 15), padx=15)
         
         # audio icon always in top right
-        self.audio_icon = ttk.Label(
+        self.audio_icon = tk.Label(
             self.top_frame,
             text='🔊', # lazy pls change to image
-            style="AudioIcon.TLabel"
         )
         self.audio_icon.pack(side="right")
         
-        self.word_frame = ttk.Frame(self.top_frame, style="Dark.TFrame")
+        self.word_frame = tk.Frame(self.top_frame, bg="#1e1e1e")
         self.word_frame.pack(side="top", fill="x", anchor="w")
         
         self.text_display = tk.Text(
@@ -94,7 +93,7 @@ class PronunciationPanel:
 
         self.text_display.config(state="disabled")
 
-        self.phoneme_frame = ttk.Frame(self.top_frame, style="Dark.TFrame")
+        self.phoneme_frame = tk.Frame(self.top_frame, bg="#1e1e1e")
         
         self.phoneme_display = tk.Text(
             self.phoneme_frame,
@@ -120,7 +119,7 @@ class PronunciationPanel:
         divider = ttk.Separator(self.inner_frame, orient="horizontal")
         divider.pack(fill="x", pady=(0, 15), padx=15)
         
-        self.scroll_frame = ttk.Frame(self.inner_frame, style="Dark.TFrame")
+        self.scroll_frame = tk.Frame(self.inner_frame, bg='#1e1e1e')
         self.scroll_frame.pack(fill="both", expand=True, padx=15)
 
         self.scrollbar = ttk.Scrollbar(self.scroll_frame, orient="vertical")
@@ -137,7 +136,7 @@ class PronunciationPanel:
         self.canvas.pack(side="left", fill="both", expand=True)
 
         self.scrollbar.config(command=self.canvas.yview)
-        self.scrollable_frame = ttk.Frame(self.canvas, style="Dark.TFrame")
+        self.scrollable_frame = tk.Frame(self.canvas, bg='#1e1e1e')
 
         self.canvas_window = self.canvas.create_window(
             (0, 0), 
@@ -151,10 +150,9 @@ class PronunciationPanel:
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
-        self.scroll_indicator = ttk.Label(
+        self.scroll_indicator = tk.Label(
             self.inner_frame,
             text="▼ Scroll for more",
-            style="ScrollIndicator.TLabel"
         )
 
     def display_phoneme_with_tags(self, phonemes):
@@ -228,7 +226,7 @@ class PronunciationPanel:
 
     def add_feedback_item(self, phoneme, description, color):
         # container for each one
-        item_frame = ttk.Frame(self.scrollable_frame, style="Dark.TFrame")
+        item_frame = tk.Frame(self.scrollable_frame, bg="#1e1e1e")
         item_frame.pack(fill="x", pady=(0, 15))
         
         style_name = f"Phoneme{color.replace('#', '')}.TLabel"
