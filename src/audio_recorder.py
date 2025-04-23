@@ -4,6 +4,8 @@ import threading
 import os
 from pydub import AudioSegment
 from pydub.playback import play
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from difflib import SequenceMatcher
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
@@ -18,6 +20,10 @@ class AudioRecorder:
         self.callback = callback
         self.filename = None
 
+    def set_callback(self, callback):
+        # used when transfering tabs
+        self.callback = callback
+        
     def play_recording(self):
         """Play the last recorded audio file."""
         if self.filename and os.path.exists(self.filename):
@@ -81,6 +87,7 @@ class AudioRecorder:
 
         print(f"Audio file saved as {self.filename}")
         # process audio now that recording is stopped
-        threading.Thread(
-            target=self.callback, args=(self.filename,), daemon=True
-        ).start()
+        if self.callback:
+            threading.Thread(
+                target=self.callback, args=(self.filename,), daemon=True
+            ).start()

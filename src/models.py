@@ -1,3 +1,6 @@
+import os
+os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+
 import torch
 import sounddevice as sd
 import librosa 
@@ -5,7 +8,6 @@ import threading
 from gtts import gTTS
 from pydub import AudioSegment
 from pydub.playback import play
-import os
 # currently reads audio file. ok for now
 def load_audio(audio_path, sample_rate):
     audio_input, sr = librosa.load(audio_path, sr=sample_rate)
@@ -23,9 +25,9 @@ def play_tts(text):
 
     threading.Thread(target=_play, daemon=True).start() # avoid freezing main ui thread
 
-# Speech to text model 
-# perhaps looking into. Currently we have our phonemes not segmented (HARD?!)
-# I think this would be better
+#### DELETE PHONEME MODEL FOR STORAGE ####
+# this model might get thrown but i need further testing with whisper
+# Whisper model is core to chat bot
 class STTModel:
     def __init__(self, model_name="jonatasgrosman/wav2vec2-large-xlsr-53-english", sample_rate=16000):
         from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
@@ -51,13 +53,15 @@ class STTModel:
         transcription = self.processor.decode(predicted_ids[0])
 
         return transcription
+
+class WhisperModel:
+    def __init__(self, model_name="openai/whisper-small.en", sample_rate=16000):
+
+        from transformers import WhisperProcessor, WhisperForConditionalGeneration
         
-class PhonemeModel:
-    def __init__(self, model_name="Bluecast/wav2vec2-Phoneme", sample_rate=16000):
-        from transformers import AutoProcessor, AutoModelForCTC
+        self.processor = WhisperProcessor.from_pretrained(model_name)
+        self.model = WhisperForConditionalGeneration.from_pretrained(model_name)
         
-        self.processor = AutoProcessor.from_pretrained(model_name)
-        self.model = AutoModelForCTC.from_pretrained(model_name)
         self.sample_rate = sample_rate
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() 
@@ -65,16 +69,26 @@ class PhonemeModel:
             else 'cpu'
         )
         self.model.to(self.device)
-
-    def get_phoneme_prediction(self, audio_path):   
+        self.device = torch.device("cpu")
+        self.model.to(self.device)
+            
+    def transcribe(self, audio_path):
+  
         audio_input = load_audio(audio_path, self.sample_rate)
-        input_values = self.processor(audio_input, return_tensors="pt", sampling_rate=self.sample_rate).input_values
-        input_values = input_values.to(self.device) 
-
+        
+        input_features = self.processor(
+            audio_input, 
+            sampling_rate=self.sample_rate, 
+            return_tensors="pt"
+        ).input_features
+        input_features = input_features.to(self.device)
+    
         with torch.no_grad():
-            logits = self.model(input_values).logits
-
-        predicted_ids = torch.argmax(logits, dim=-1)
-        phonemes = self.processor.decode(predicted_ids[0])
-
-        return phonemes.upper().split()
+            predicted_ids = self.model.generate(input_features)
+        
+        transcription = self.processor.batch_decode(
+            predicted_ids, 
+            skip_special_tokens=True
+        )[0]
+        
+        return transcription
