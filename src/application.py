@@ -340,7 +340,7 @@ class Application:
         """Processes recorded audio and highlights incorrect phonemes."""
         print("Processing audio:", filename)
 
-        user_text = "hey there rude"
+        user_text = self.stt_model.transcribe(filename)
         print("Transcription:", user_text)
 
         user_phonemes = tp.text_to_ipa_phoneme(user_text)
@@ -349,10 +349,10 @@ class Application:
         target_words = self.current_text.split()
         user_words = user_text.split()
 
-        # if user speaks too few or too many words program breaks. we probably wont fix this lol
-        if len(target_words) != len(user_words):
-            self.highlight_all_red() # Pass phoneme length too
-            self.user_play_button.config(state="normal") # Enable play after processing fails
+        # user didnt even try
+        if abs(len(target_words) - len(user_words)) >= 4:
+            self.highlight_all_red()
+            self.user_play_button.config(state="normal")
             return
 
         self.error_info = ed.get_pronunciation_score(self.current_text, self.current_phoneme, user_phonemes)

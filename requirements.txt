@@ -9,5 +9,4 @@ pyaudio
 pydub
 gtts
 panphon
-difflib
 spacy
