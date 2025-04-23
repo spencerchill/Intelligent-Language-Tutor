@@ -5,13 +5,19 @@ import text_processing as tp
 import error_detection as ed
 import models as md
 from audio_recorder import AudioRecorder
+
+import matplotlib.pyplot as plt
+from scipy.io import wavfile
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+
 from pronunciation_panel import PronunciationPanel
 from jaide_gui import JaideGUI
 
 
+
 class Application:
     def __init__(self):
-
         # Style Elements WHITE VERSION.
         # NOTE: If you add a toggle for themes you need
         #       to pass the flag to the jaide_gui to then change its theme
@@ -24,6 +30,7 @@ class Application:
         self.speech_enable = True
         self.spectrogram_enable = False
         self.ai_model_enable = False
+
 
         self.root = tk.Tk()
         self.root.title("Language Tutor")
@@ -38,11 +45,10 @@ class Application:
         self.root.option_add("*TLabel*Background", self.background)
         self.root.option_add("*TLabel*Foreground", "black")
         ####_______________________________________________####
-
         self.recorder = AudioRecorder(callback=self.process_audio)
         self.stt_model = md.STTModel()
 
-        self.current_text = "hey there dude"
+        self.current_text = gen_random_text()
         self.current_phoneme = tp.text_to_ipa_phoneme(self.current_text)
         self.display_phoneme = ''.join(self.current_phoneme)
         self.error_info = None
@@ -117,7 +123,6 @@ class Application:
         self.tab_selected_bar = tk.PhotoImage(file="images/tab_bar.png")
         self.tab_image_id = self.tab_bar_canvas.create_image(150, 50, image=self.tab_selected_bar)
 
-
         ##### TEXT CANVAS #####
         self.gen_text_canvas = tk.Canvas(self.root, width=600, height=100, borderwidth=0,
                                          highlightthickness=0, bg=self.background)
@@ -127,6 +132,7 @@ class Application:
                                     borderwidth=0, highlightthickness=0,
                                     background=self.box_color,
                                     fg=self.text_fill)
+                                    
         self.text_display.insert("1.0", self.current_text)
         self.text_display.config(state="disabled")
         self.text_display.tag_config("correct", foreground="green")
@@ -154,11 +160,13 @@ class Application:
                                        fg=self.text_fill, height=4, width=40,
                                        borderwidth=0, highlightthickness=0,
                                        background=self.box_color)
+                                    
         self.phoneme_display.insert("1.0", self.display_phoneme)
         self.phoneme_display.config(state="disabled")
         self.phoneme_display.tag_config("correct", foreground="green")
         self.phoneme_display.tag_config("incorrect", foreground="red")
         self.phoneme_display.tag_config("partial", foreground="orange")
+
         def round_rectangle_user(x1, y1, x2, y2, radius=25, **kwargs):
              points = [x1+radius, y1, x1+radius, y1, x2-radius, y1, x2-radius, y1, x2, y1, x2, y1+radius, x2, y1+radius, x2, y2-radius, x2, y2-radius, x2, y2, x2-radius, y2, x2-radius, y2, x1+radius, y2, x1+radius, y2, x1, y2, x1, y2-radius, x1, y2-radius, x1, y1+radius, x1, y1+radius, x1, y1]
              return self.user_phoneme_canvas.create_polygon(points, **kwargs, smooth=True)
@@ -197,6 +205,34 @@ class Application:
         self.spectrogram_canvas = tk.Canvas(self.root, width=100, height=100, borderwidth=0,
                                            highlightthickness=0, bg="lightblue") 
         self.spectrogram_canvas.create_text(50, 50, text="Spectrogram Area")
+        
+    def show_spectrogram(self):
+        filename = "user_recording.wav"
+        if not filename:
+            print("No recording available.")
+            return
+        try:
+            # Read audio
+            rate, data = wavfile.read(filename)
+            # Clear previous plot if needed
+            for widget in self.spectrogram_canvas.winfo_children():
+                widget.destroy()
+            # Plot spectrogram
+            fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
+            ax.specgram(data, Fs=rate, NFFT=1024, noverlap=512, cmap="inferno")
+            ax.set_title("Spectrogram")
+            ax.set_xlabel("Time")
+            ax.set_ylabel("Frequency")
+            fig.tight_layout()
+            
+            # Embed matplotlib figure into Tkinter canvas
+            canvas = FigureCanvasTkAgg(fig, master=self.spectrogram_canvas)
+            canvas.draw()
+            canvas_widget = canvas.get_tk_widget()
+            canvas_widget.pack()
+
+        except Exception as e:
+            print("Error generating spectrogram:", e)
 
     def speech_click(self):
         if not self.speech_enable:
@@ -250,7 +286,8 @@ class Application:
 
     def enable_spectrogram_ui(self):
         self.spectrogram_enable = True
-        self.spectrogram_canvas.pack(pady=20, fill="both", expand=True) # Allow fill/expand
+        self.spectrogram_canvas.pack()
+        self.show_spectrogram()
         self.root.update()
 
     def disable_spectrogram_ui(self):
@@ -287,7 +324,7 @@ class Application:
         self.phoneme_display.insert("1.0", self.display_phoneme)
         self.phoneme_display.config(state="disabled")
         # Disable play button as there’s no new recording
-        self.user_play_button.config(state="disabled") # Removed bg change
+        self.user_play_button.config(state="disabled")
 
     def toggle_recording(self):
         """Toggle the recording state."""
