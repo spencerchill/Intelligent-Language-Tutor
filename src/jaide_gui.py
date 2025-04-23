@@ -78,15 +78,28 @@ class JaideGUI:
         self.input_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="ew")
         self.input_frame.columnconfigure(0, weight=1)
 
+        self.user_input_field = ttk.Entry(
+            self.input_frame,
+            font=("Inter", 14),
+            width=30
+        )
+        self.user_input_field.grid(row=0, column=0, sticky="ew", padx=(0, 5), ipady=6)
+        self.user_input_field.bind("<Return>", self.on_user_input)
+
         self.recording = False
         self.record_btn = ttk.Button(
             self.input_frame,
-            text="🎙️ Start Recording",
+            text="Start Recording",
             command=self.toggle_recording,
             style="Primary.TButton",
             width=20
         )
+    
         self.record_btn.grid(row=0, column=0, sticky="ew", ipady=6)
+
+        self.chat_display.focus()
+        self.chat_display.bind("<Return>", self.on_user_input)
+
         self.loading_label = ttk.Label(
         self.input_frame,
         text="●  ○  ○",
@@ -95,22 +108,156 @@ class JaideGUI:
         anchor="center",
         justify="center"
         )
-
         self.loading_label.grid(row=0, column=0, sticky="ew", ipady=6)
         self.loading_label.grid_remove()
         # initial message
         self.display_bot_message("Hi there! I'm here to help you learn English. Let's have a conversation to help you practice your English. What's your name?", "", "")
 
+    def create_widgets(self):
+        self.container.columnconfigure(0, weight=1)
+        self.container.rowconfigure(1, weight=1)
+
+        self.header_frame = ttk.Frame(self.container, style="TFrame")
+        self.header_frame.grid(row=0, column=0, pady=(0, 0), sticky="ew")
+        self.header_frame.columnconfigure(0, weight=1) 
+        self.header_frame.columnconfigure(1, weight=0)  
+
+        self.title = tk.Label(
+            self.header_frame,
+            text="🎓 Practice with Jaide!",
+            font=("Inter", 18),
+            foreground="#2E6F40",
+            bg=self.background
+        )
+        self.title.grid(row=0, column=0, pady=(0, 0), sticky="w")
+
+        self.reset_btn = ttk.Button(
+            self.header_frame,
+            text="↻ Reset",
+            command=self.reset_conversation,
+            style="Primary.TButton",
+            width=10
+        )
+        self.reset_btn.grid(row=0, column=1, padx=(5, 0), sticky="e")
+        
+        self.chat_display = tk.Text(
+            self.container,
+            bg=self.background,
+            fg=self.text_fill,
+            insertbackground="#eaeaea",
+            font=("Inter", 16),
+            wrap="word",
+            relief="flat",
+            height=8,
+            undo=True 
+        )
+        self.chat_display.grid(row=1, column=0, padx=10, pady=(10, 5), sticky="nsew")
+        self.chat_display.config(state="disabled")  
+        
+        self.chat_display.tag_configure("bot", foreground="#2E6F40")
+        self.chat_display.tag_configure("user", foreground="#ff9933")
+        self.chat_display.tag_configure("feedback", foreground="#2f2f2f")
+        self.chat_display.tag_configure("grammar", foreground="#3385ff", font=("Inter", 16, "italic"))
+        self.chat_display.tag_configure("transition", foreground="#2f2f2f")
+        self.chat_display.tag_configure("question", foreground="#2f2f2f")
+        self.chat_display.tag_configure("user-sentence", foreground="orange")
+        self.chat_display.tag_configure("correct", foreground="green")  
+        self.chat_display.tag_configure("notice", foreground="#2f2f2f")
+        # Add a frame for additional controls
+        self.input_frame = ttk.Frame(self.container, style="TFrame")
+        self.input_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="ew")
+        self.input_frame.columnconfigure(0, weight=1)
+        
+        self.user_input_field = ttk.Entry(
+            self.input_frame,
+            font=("Inter", 14)
+        )
+        self.user_input_field.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 5), ipady=6)
+        self.user_input_field.bind("<Return>", self.on_user_input)
+
+        self.recording = False
+        self.record_btn = ttk.Button(
+            self.input_frame,
+            text="🎙️ Start Recording",
+            command=self.toggle_recording,
+            style="Primary.TButton",
+            width=20
+        )
+        self.record_btn.grid(row=1, column=0, sticky="ew", ipady=6)
+
+        self.loading_label = ttk.Label(
+            self.input_frame,
+            text="●  ○  ○",
+            font=("Courier", 12),
+            foreground="#91d6c2",
+            anchor="center",
+            justify="center"
+        )
+        self.loading_label.grid(row=1, column=0, sticky="ew", ipady=6)
+        self.loading_label.grid_remove()
+
+        # initial message
+        self.display_bot_message(
+            "Hi there! I'm here to help you learn English. You can either type or speak your responses.\n"
+            "           If you'd like pronunciation help, just type 'Help me pronounce [word]'.\n"
+            "           For example, you can say 'Help me pronounce apple' (not imp yet).\n"
+            "           What's your name?",
+            "",
+            ""
+        )
     def toggle_recording(self):
         if self.processing:
             return
         if not self.recorder.is_recording():
-            self.record_btn.config(text="⏹️ Stop Recording", style="Danger.TButton")
+            self.record_btn.config(text="Stop Recording", style="Danger.TButton")
             self.recorder.start_recording()
         else:
-            self.record_btn.config(text="🎙️ Start Recording", style="Primary.TButton")
+            self.record_btn.config(text="Start Recording", style="Primary.TButton")
             self.recorder.stop_recording()
 
+    def reset_conversation(self):
+        if self.processing:
+            return
+            
+        self.jaide_model.reset_conversation()
+        
+        self.chat_display.config(state="normal")
+        self.chat_display.delete("1.0", tk.END)
+        self.chat_display.config(state="disabled")
+        
+        self.user_input_field.delete(0, tk.END)
+        
+        self.display_bot_message(
+            "Hi there! I'm here to help you learn English. You can either type or speak your responses.\n"
+            "           If you'd like pronunciation help, just type 'Help me pronounce [word]'.\n"
+            "           For example, you can say 'Help me pronounce apple'.\n"
+            "           What's your name?",
+            "",
+            ""
+        )
+        self.user_input_field.focus()
+
+    def on_user_input(self, event=None):
+        user_input = self.user_input_field.get().strip()
+        self.user_input_field.delete(0, tk.END)
+        if self.processing or not user_input:
+            return
+
+        self.user_input_field.config(state="disabled")
+
+        if user_input.lower().startswith("how to pronounce"):
+            return "Not implemented"
+            word = user_input[len("how to pronounce "):].strip()
+            self.provide_pronunciation_help(word)
+        else:
+            self.processing = True
+            self.parent.after(0, self.start_loading_animation)
+            def process():
+                self.display_user_message(user_input)
+                response, edited_sentence = self.jaide_model.respond(user_input)
+                self.parent.after(0, lambda: self.finish_processing(response, user_input, edited_sentence))
+            threading.Thread(target=process, daemon=True).start()
+            
     def start_loading_animation(self):
         self.loading_label.grid()
         self.record_btn.grid_remove()
@@ -153,14 +300,15 @@ class JaideGUI:
 
         def process():
             user_sentence = self.stt_model.transcribe(filename)
+            self.display_user_message(user_sentence)
             response, edited_sentence = self.jaide_model.respond(user_sentence)
             self.parent.after(0, lambda: self.finish_processing(response, user_sentence, edited_sentence))
 
         threading.Thread(target=process, daemon=True).start()
 
     def finish_processing(self, response, user_sentence, edited_sentence):
-        self.display_user_message(user_sentence)
         self.display_bot_message(response, user_sentence, edited_sentence)
+        self.user_input_field.config(state="normal")
         self.processing = False
         self.stop_loading_animation()
 
