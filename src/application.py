@@ -35,6 +35,7 @@ class Application:
         self.root = tk.Tk()
         self.root.title("Language Tutor")
         self.root.geometry("800x600") 
+        self.root.resizable(0,0)
 
         #### DO NOT DELETE TS MAC DEFAULTS TO BLACK ALWAYS ####
         self.root.configure(bg=self.background)
@@ -76,7 +77,9 @@ class Application:
         style.map("Custom.TButton",
                 background=[("active", "#78c2ad")], # mint color
                 foreground=[("active", "white")])
-
+        
+        self.screen_width=(int) (self.root.winfo_width())
+        self.screen_height= (int) (self.root.winfo_height())
 
         ##### TITLE #####
         self.title_canvas = tk.Canvas(self.root, width=700, height=60,
@@ -144,13 +147,19 @@ class Application:
              points = [x1+radius, y1, x1+radius, y1, x2-radius, y1, x2-radius, y1, x2, y1, x2, y1+radius, x2, y1+radius, x2, y2-radius, x2, y2-radius, x2, y2, x2-radius, y2, x2-radius, y2, x1+radius, y2, x1+radius, y2, x1, y2, x1, y2-radius, x1, y2-radius, x1, y1+radius, x1, y1+radius, x1, y1]
              return self.gen_text_canvas.create_polygon(points, **kwargs, smooth=True)
         my_rectangle_gen = round_rectangle_gen(0, 0, 600, 100, radius=40, fill=self.box_color)
-        self.gen_text_canvas.create_window(300, 50, window=self.text_display)
-        self.gen_play_image = tk.PhotoImage(file="images/play.png")
-        self.gen_play_button = tk.Button(self.root, image=self.gen_play_image,
-                                         borderwidth=0, background=self.box_color,
-                                         activebackground=self.box_color,
-                                         command=lambda: self.play_tts(self.current_text))
+        self.gen_text_canvas.create_window(300, 70, window=self.text_display)
+
+        self.gen_play_button = ttk.Button (
+            text="🎧Listen",
+            command=lambda: self.play_tts(self.current_text),
+            style="Custom.TButton",
+            width=8.05
+        )
+
         self.gen_text_canvas.create_window(550, 50, window=self.gen_play_button)
+
+        self.target_phrase_label = tk.Label(text="Target Phrase", font="Inter 12 bold", fg="#78c2ad", bg=self.box_color)
+        self.gen_text_canvas.create_window(300, 15, window=self.target_phrase_label)
 
         #### PHONEMES ####
         self.user_phoneme_canvas = tk.Canvas(self.root, width=600, height=100, borderwidth=0,
@@ -172,39 +181,240 @@ class Application:
              return self.user_phoneme_canvas.create_polygon(points, **kwargs, smooth=True)
 
         my_rectangle_user = round_rectangle_user(0, 0, 600, 100, radius=40, fill=self.box_color)
-        self.user_phoneme_canvas.create_window(300, 50, window=self.phoneme_display)
+        self.user_phoneme_canvas.create_window(300, 70, window=self.phoneme_display)
+        
+        self.user_play_button = ttk.Button (
+            text="▶️Play",
+            command=self.recorder.play_recording,
+            style="Custom.TButton",
+            width=8,
+            state="disabled"
+        )
 
-        self.user_play_image = tk.PhotoImage(file="images/play.png")
-        self.user_play_button = tk.Button(self.root, image=self.user_play_image,
-                                          borderwidth=0, background=self.box_color,
-                                          activebackground=self.box_color,
-                                          command=self.recorder.play_recording, state="disabled")
         self.user_phoneme_canvas.create_window(550, 50, window=self.user_play_button)
+
+        self.phoneme_label = tk.Label(text="Phonemes", font="Inter 12 bold", fg="#78c2ad", bg=self.box_color)
+        self.user_phoneme_canvas.create_window(300, 15, window=self.phoneme_label)
 
         #### RECORD BUTTON ####
         self.rbtn_canvas = tk.Canvas(self.root, width=50, height=50, borderwidth=0,
                                      highlightthickness=0, bg=self.background)
-        self.rbtn_green_image = tk.PhotoImage(file="images/rbtn_green.png")
-        self.rbtn_red_image = tk.PhotoImage(file="images/rbtn_red.png")
-        self.rbtn = tk.Button(self.rbtn_canvas, image=self.rbtn_green_image,
-                              borderwidth=0, background=self.background,
-                              activebackground=self.background,
-                              command=self.toggle_recording)
+
+        
+        self.rbtn = ttk.Button (
+            text="🟢Record",
+            command=self.toggle_recording,
+            style="Custom.TButton",
+            width=15
+        )
+
         self.rbtn_canvas.create_window(25, 25, window=self.rbtn)
 
         #### CHECK BUTTON ####
         self.check_canvas = tk.Canvas(self.root, width=50, height=50, borderwidth=0,
                                       highlightthickness=0, bg=self.background)
-        self.check_image = tk.PhotoImage(file="images/check.png")
-        self.check_button = tk.Button(self.check_canvas, image=self.check_image,
-                                      borderwidth=0, background=self.background,
-                                      activebackground=self.background,
-                                      command=self.generate)
+        
+        self.check_button= ttk.Button (
+            text="✔️New Phrase",
+            command=self.generate,
+            style="Custom.TButton",
+            width=15
+        )
+
         self.check_canvas.create_window(25, 25, window=self.check_button)
 
         self.spectrogram_canvas = tk.Canvas(self.root, width=100, height=100, borderwidth=0,
                                            highlightthickness=0, bg="lightblue") 
         self.spectrogram_canvas.create_text(50, 50, text="Spectrogram Area")
+
+        ### Score Box ###
+        self.score_canvas = tk.Canvas(self.root, width=100, height=100, borderwidth=0,
+                                        highlightthickness=0, bg=self.background)
+        
+        def round_rectangle_score(x1, y1, x2, y2, radius=25, **kwargs):
+             points = [x1+radius, y1, x1+radius, y1, x2-radius, y1, x2-radius, y1, x2, y1, x2, y1+radius, x2, y1+radius, x2, y2-radius, x2, y2-radius, x2, y2, x2-radius, y2, x2-radius, y2, x1+radius, y2, x1+radius, y2, x1, y2, x1, y2-radius, x1, y2-radius, x1, y1+radius, x1, y1+radius, x1, y1]
+             return self.score_canvas.create_polygon(points, **kwargs, smooth=True)
+        
+        my_rectangle_score = round_rectangle_score(0, 0, 100, 100, radius=10, fill=self.box_color)
+
+        self.score_canvas.create_text(50, 25, text="Score", font=self.font, fill="black")
+        self.score_canvas_text_id = self.score_canvas.create_text(50, 50, text="---", font=self.font, fill="black")
+        self.score_canvas.place(x=self.screen_width,y=450)
+        
+        ### Tutorial GUIs ###
+                ### Main Tutorial ###
+        self.tutorial_btn_canvas = tk.Canvas(self.root, width=100, height=100, borderwidth=0,
+                                      highlightthickness=0, bg=self.background)
+        
+        def round_rectangle_tutorial(x1, y1, x2, y2, radius=25, **kwargs):
+             points = [x1+radius, y1, x1+radius, y1, x2-radius, y1, x2-radius, y1, x2, y1, x2, y1+radius, x2, y1+radius, x2, y2-radius, x2, y2-radius, x2, y2, x2-radius, y2, x2-radius, y2, x1+radius, y2, x1+radius, y2, x1, y2, x1, y2-radius, x1, y2-radius, x1, y1+radius, x1, y1+radius, x1, y1]
+             return self.tutorial_btn_canvas.create_polygon(points, **kwargs, smooth=True)
+        
+        my_rectangle_tutorial = round_rectangle_tutorial(0, 0, 100, 100, radius=10, fill=self.box_color)
+
+        self.tutorial_button = ttk.Button(
+            text="❔",
+            command=self.show_tutorial,
+            style="Custom.TButton",
+            width=2
+        )
+
+        self.tutorial_btn_canvas.create_text(50, 25, text="Tutorial", font=self.font, fill="black")
+        self.tutorial_btn_canvas.create_window(50, 50, window=self.tutorial_button)
+        self.tutorial_btn_canvas.place(x=self.screen_width/12, y=450)  
+
+        self.t_canvas = tk.Canvas(self.root, background="white", width=self.screen_width/2, height=self.screen_height-150)
+        self.t_canvas.create_text(200, 50, text="Tutorial", font="Inter 26 bold", fill="#78c2ad")
+        self.t_canvas.create_text(200, 100, text="🎧Listen", font=self.font, fill="black")
+        self.t_canvas.create_text(200, 125, text="- Click to listen to target phrase.", font=self.font, fill="black")
+        self.t_canvas.create_text(200, 175, text="▶️Play", font=self.font, fill="black")
+        self.t_canvas.create_text(200, 200, text="- Click to playback recorded audio.", font=self.font, fill="black")
+        self.t_canvas.create_text(200, 250, text="🟢Record", font=self.font, fill="black")
+        self.t_canvas.create_text(200, 275, text="- Click to record.", font=self.font, fill="black")
+        self.t_canvas.create_text(200, 325, text="✔️New Phrase", font=self.font, fill="black")
+        self.t_canvas.create_text(200, 350, text="- Click to generate a new target phrase.", font=self.font, fill="black")
+
+        self.exit_tutorial_btn = ttk.Button(
+            text="Exit",
+            command=self.hide_tutorial,
+            style="Custom.TButton"
+        )
+
+                ### Target Phrase GUI ###
+        self.target_phrase_tutorial_btn = ttk.Button(
+            text="❔",
+            command=self.show_target_phrase_tutorial,
+            style="Custom.TButton",
+            width=2
+        )
+
+        self.target_phrase_canvas = tk.Canvas(self.root, background="white", width=self.screen_width/2, height=self.screen_height-150)
+        self.target_phrase_canvas.create_text(200, 50, text="Target Phrase", font="Inter 26 bold", fill="#78c2ad")
+        self.target_phrase_canvas.create_text(200, 100, text="Before Grading", font=self.font, fill="#78c2ad")
+        self.target_phrase_canvas.create_text(200, 125, text="- Text will be highlighted black.", font=self.font, fill="black")
+        self.target_phrase_canvas.create_text(200, 150, text="- Your goal is to say the target phrase.", font=self.font, fill="black")
+        self.target_phrase_canvas.create_text(200, 175, text="- Click on individual words to hear them." , font=self.font, fill="black")
+
+        self.target_phrase_canvas.create_text(200, 225, text="After Grading", font=self.font, fill="#78c2ad")
+        self.target_phrase_canvas.create_text(200, 250, text="- Text will be highlighted green, yellow, or red,",
+                                              font=self.font, fill="black")
+        self.target_phrase_canvas.create_text(200, 270, text="correct, partialy correct, or incorrect respectivley.",
+                                              font=self.font, fill="black")
+        self.target_phrase_canvas.create_text(200, 295, text="- Accuracy will be given in the bottom right.", font=self.font, fill="black")
+        self.target_phrase_canvas.create_text(200, 320, text="- Click on individual words for feedback", font=self.font, fill="black")
+        self.target_phrase_canvas.create_text(200, 340, text="and to see how you performed!", font=self.font, fill="black")
+
+        self.exit_target_phrase_tutorial_btn = ttk.Button(
+            text="Exit",
+            command=self.hide_target_phrase_tutorial,
+            style="Custom.TButton"
+        )
+
+        self.gen_text_canvas.create_window(50, 50, window=self.target_phrase_tutorial_btn)
+
+
+                ### Phoneme GUI ###
+        self.phoneme_tutorial_btn = ttk.Button(
+            text="❔",
+            command=self.show_phoneme_tutorial,
+            style="Custom.TButton",
+            width=2
+        )
+
+        self.phoneme_tutorial_canvas = tk.Canvas(self.root, background="white", width=self.screen_width/2, height=self.screen_height-150)
+        self.phoneme_tutorial_canvas.create_text(200, 50, text="Phonemes", font="Inter 26 bold", fill="#78c2ad")
+        self.phoneme_tutorial_canvas.create_text(200, 100, text="Phonemes are any of the perceptually distinct", font=self.font, fill="black")
+        self.phoneme_tutorial_canvas.create_text(200, 120, text="units of sound in a language that distinguish", font=self.font, fill="black")
+        self.phoneme_tutorial_canvas.create_text(200, 140, text="one word for anoter.", font=self.font, fill="black")
+        self.phoneme_tutorial_canvas.create_text(200, 190, text="The phonemes shown are from the", font=self.font, fill="black")
+        self.phoneme_tutorial_canvas.create_text(200, 210, text="International Phonetic Alphabet (IPA).", font=self.font, fill="black")
+
+        self.exit_phoneme_tutorial_btn = ttk.Button(
+            text="Exit",
+            command=self.hide_phoneme_tutorial,
+            style="Custom.TButton"
+        )
+
+        self.user_phoneme_canvas.create_window(50, 50, window=self.phoneme_tutorial_btn)
+
+
+    ### Tutorial GUI Transitions ###
+
+            ### Main Tutorial ###
+    def show_tutorial(self):
+        self.tutorial_button.config(command=self.hide_tutorial)
+        
+        self.disable_buttons()
+
+        self.t_canvas.place(x=self.screen_width/4, y=self.screen_height/6)
+        self.t_canvas.create_window(200, 400, window=self.exit_tutorial_btn)
+        self.t_canvas.update()
+    
+    def hide_tutorial(self):
+        self.tutorial_button.config(command=self.show_tutorial)
+        
+        self.enable_buttons()
+
+        self.t_canvas.place_forget()
+        self.root.update()
+    
+
+            ### Target Phrase Tutorial ###
+    def show_target_phrase_tutorial(self):
+        self.target_phrase_tutorial_btn.config(command=self.hide_target_phrase_tutorial)
+        
+        self.disable_buttons()
+
+        self.target_phrase_canvas.place(x=self.screen_width/4, y=self.screen_height/6)
+        self.target_phrase_canvas.create_window(200, 400, window=self.exit_target_phrase_tutorial_btn)
+        self.target_phrase_canvas.update()
+    
+    def hide_target_phrase_tutorial(self):
+        self.target_phrase_tutorial_btn.config(command=self.show_target_phrase_tutorial)
+
+        self.enable_buttons()
+
+        self.target_phrase_canvas.place_forget()
+        self.root.update()
+
+            ### Phoneme Tutorial ###
+    def show_phoneme_tutorial(self):
+        self.phoneme_tutorial_btn.config(command=self.hide_phoneme_tutorial)
+
+        self.disable_buttons()
+
+        self.phoneme_tutorial_canvas.place(x=self.screen_width/4, y=self.screen_height/6)
+        self.phoneme_tutorial_canvas.create_window(200, 400, window=self.exit_phoneme_tutorial_btn)
+        self.phoneme_tutorial_canvas.update()
+    
+    def hide_phoneme_tutorial(self):
+        self.phoneme_tutorial_btn.config(command=self.show_phoneme_tutorial)
+        
+        self.enable_buttons()
+
+        self.phoneme_tutorial_canvas.place_forget()
+        self.root.update()
+
+            ### Enable/Disable Buttons ###
+    def enable_buttons(self):
+        self.speech_btn.config(state="normal")
+        self.spectrogram_btn.config(state="normal")
+        self.ai_model_btn.config(state="normal")
+        self.rbtn.config(state="normal")
+        self.check_button.config(state="normal")
+        self.gen_play_button.config(state="normal")
+        if self.recorder.has_recording():
+            self.user_play_button.config(state="normal")
+
+    def disable_buttons(self):
+        self.speech_btn.config(state="disabled")
+        self.spectrogram_btn.config(state="disabled")
+        self.ai_model_btn.config(state="disabled")
+        self.rbtn.config(state="disabled")
+        self.check_button.config(state="disabled")
+        self.gen_play_button.config(state="disabled")
+        self.user_play_button.config(state="disabled")
+
         
     def show_spectrogram(self):
         filename = "user_recording.wav"
@@ -271,9 +481,17 @@ class Application:
         self.speech_enable = True
         self.recorder.set_callback(self.process_audio)
         self.gen_text_canvas.pack(pady=0)
+        self.gen_text_canvas.update()
         self.user_phoneme_canvas.pack(pady=20)
+        self.user_phoneme_canvas.update()
         self.rbtn_canvas.pack(pady=0)
+        self.rbtn_canvas.update()
         self.check_canvas.pack(pady=20)
+        self.check_canvas.update()
+        self.tutorial_btn_canvas.place(x=30, y=450)
+        self.tutorial_btn_canvas.update()
+        self.score_canvas.place(x=630,y=450)
+        self.score_canvas.update()
         self.root.update()
 
     def disable_speech_ui(self):
@@ -282,6 +500,8 @@ class Application:
         self.user_phoneme_canvas.pack_forget()
         self.rbtn_canvas.pack_forget()
         self.check_canvas.pack_forget()
+        self.tutorial_btn_canvas.place_forget()
+        self.score_canvas.place_forget()
         self.root.update()
 
     def enable_spectrogram_ui(self):
@@ -325,15 +545,16 @@ class Application:
         self.phoneme_display.config(state="disabled")
         # Disable play button as there’s no new recording
         self.user_play_button.config(state="disabled")
+        self.score_canvas.itemconfig(self.score_canvas_text_id, text="---", fill="black")
 
     def toggle_recording(self):
         """Toggle the recording state."""
         if not self.recorder.is_recording():
-            self.rbtn.config(image=self.rbtn_red_image)
+            self.rbtn.config(text="🔴Stop Recording")
             self.recorder.start_recording()
         else:
             self.recorder.stop_recording()
-            self.rbtn.config(image=self.rbtn_green_image)
+            self.rbtn.config(text="🟢Record")
             # do not enable untill after processing finished
 
     def process_audio(self, filename):
@@ -359,6 +580,7 @@ class Application:
         # create section for accuracy later
         self.highlight_text(self.error_info['incorrect_indices'])
         self.highlight_phonemes(self.error_info['phoneme_indices'])
+        self.update_accuracy_label(self.error_info['accuracy'])
         self.user_play_button.config(state="normal")
 
     def highlight_all_red(self): 
@@ -406,6 +628,10 @@ class Application:
         for index, severity in incorrect_indices:
             self.text_display.tag_add(severity, f"1.{index}", f"1.{index+1}")
         self.text_display.config(state="disabled")
+
+    def update_accuracy_label(self, accuracy):
+        self.score_canvas.itemconfig(self.score_canvas_text_id, text=str(round(accuracy, 2)) + "%", 
+                                     fill="black", font=self.font)
 
 
     def on_word_click(self, event):

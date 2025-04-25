@@ -35,6 +35,12 @@ class AudioRecorder:
     def delete_recording(self):
         if self.filename and os.path.exists(self.filename):
             os.remove(self.filename)
+    
+    def has_recording(self):
+        if self.filename and os.path.exists(self.filename):
+            return True
+        else:
+            False
 
     def is_recording(self):
         return self._is_recording
