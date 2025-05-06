@@ -7,6 +7,8 @@ import re
 
 # dont delete this pls
 def text_to_phoneme(text):
+    # clean text for processing
+    text = re.sub(r"[^\w\s']", '', text)
     g2p = G2p()
     phonemes = g2p(text)
     #remove stress markers of phonetic representation
@@ -37,6 +39,6 @@ def text_to_ipa_phoneme(text):
  
 
 if __name__ == "__main__":
-    text = "nice to meet you"    
+    text = "dog, there."    
     phoneme_output = text_to_ipa_phoneme(text)
     print("IPA:", phoneme_output)

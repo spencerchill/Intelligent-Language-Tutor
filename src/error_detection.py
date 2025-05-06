@@ -1,17 +1,22 @@
 import numpy as np
+import pickle
 from panphon.distance import Distance
 import panphon.featuretable
+import re
 # magic to default panphon to utf-8 encoding
 # else it wont work on windows
 panphon.featuretable.open = lambda fn, *args, **kwargs: open(fn, *args, encoding='utf-8', **kwargs)
 # threshold which phonemes are considered slightly mispronounced
 COST_THRESHOLD = 0.09
 
+with open('res/dist_matrix.pkl', 'rb') as f:
+    dist_matrix = pickle.load(f)
+
 IPA_MAPPINGS = {
    # consonants
     'ð': 2, 'θ': 2, 'tʃ': 2, 'ʃ': 2, 'ŋ': 2,
     'ʒ': 2, 'dʒ': 2, 'j': 1, 'r': 1, 'l': 1,
-    'w': 1, 'm': 1, 'n': 1, 'k': 1, 'g': 1,
+    'w': 1, 'm': 1, 'n': 1, 'k': 1, 'g': 1, 'ɡ':1,
     'f': 1, 'v': 1, 's': 1, 'z': 1, 'p': 1,
     'b': 1, 't': 1, 'd': 1,
     # vowels
@@ -113,11 +118,11 @@ def needleman_wunsch_with_debug(target_phonemes, user_phonemes,
             #print(f"  Best move: {move_names[best_move]} with score {score[i, j]}")
     
 
-   # print("\n--- FINAL SCORE MATRIX ---")
-   # print_matrix(score, target_phonemes, user_phonemes)
+    print("\n--- FINAL SCORE MATRIX ---")
+    print_matrix(score, target_phonemes, user_phonemes)
     
-   # print("\n--- FINAL TRACEBACK MATRIX ---")
-   # print_traceback_matrix(traceback, target_phonemes, user_phonemes)
+    print("\n--- FINAL TRACEBACK MATRIX ---")
+    print_traceback_matrix(traceback, target_phonemes, user_phonemes)
     
     #print("\n--- TRACEBACK ALIGNMENT ---")
     mispronounced_indices = {}
@@ -335,6 +340,11 @@ def needleman_wunsch(target_phonemes, user_phonemes, match_reward=3, gap_penalty
         gap_penalty: Standard gap penalty
     """
     dist = Distance()
+
+    feature_edit_distance = dist.weighted_feature_edit_distance(target_phonemes, user_phonemes)
+    max_possible_distance = dist.weighted_feature_edit_distance(target_phonemes, "")
+    accuracy =  (1 - (feature_edit_distance / max_possible_distance)) * 100
+
     m, n = len(target_phonemes), len(user_phonemes)
 
     score = np.zeros((m+1, n+1), dtype=float)
@@ -351,26 +361,23 @@ def needleman_wunsch(target_phonemes, user_phonemes, match_reward=3, gap_penalty
         score[0, j] = score[0, j-1] + gap_penalty
         traceback[0, j] = 2
     
+    
     # fill matrix
     for i in range(1, m+1):
         for j in range(1, n+1):
             if target_phonemes[i-1] == user_phonemes[j-1]:
                 diag_score = score[i-1, j-1] + match_reward
             else:
-
-                feature_dist = dist.feature_edit_distance(target_phonemes[i-1], user_phonemes[j-1])
+                feature_dist = dist_matrix[(target_phonemes[i-1], user_phonemes[j-1])]
                 # scale similarity acc to match reward
                 similarity = (1 - feature_dist) * match_reward
                 diag_score = score[i-1, j-1] + similarity
-            
             # up and left scores (gaps)
             up_score = score[i-1, j] + gap_penalty
             left_score = score[i, j-1] + gap_penalty
             
             best_scores = [diag_score, up_score, left_score]
             best_move = np.argmax(best_scores)
-            
-            # store
             score[i, j] = best_scores[best_move]
             traceback[i, j] = best_move
     
@@ -378,16 +385,16 @@ def needleman_wunsch(target_phonemes, user_phonemes, match_reward=3, gap_penalty
     mispronounced_indices = {}
     i, j = m, n
     target_idx = m - 1
-    
     while i > 0 or j > 0:
         if i > 0 and j > 0 and traceback[i, j] == 0:  # diagonal (match or substitution)
-            feature_dist = dist.feature_edit_distance(target_phonemes[i-1], user_phonemes[j-1])
-            if feature_dist > 0:  
+            feature_dist = dist_matrix[(target_phonemes[i-1], user_phonemes[j-1])]
+            if feature_dist > 0:
                 severity = 'partial' if feature_dist <= COST_THRESHOLD else 'incorrect'
                 mispronounced_indices[target_idx] = severity
             i -= 1
             j -= 1
             target_idx -= 1
+        
         elif i > 0 and traceback[i, j] == 1:  # up (deletion)
             # Missing phoneme in user pronunciation
             mispronounced_indices[target_idx] = "incorrect"
@@ -395,21 +402,13 @@ def needleman_wunsch(target_phonemes, user_phonemes, match_reward=3, gap_penalty
             target_idx -= 1
             
         else:  # left (insertion)
-            # 
             # i knda forgpt why i did this but its important
             if target_idx >= 0 and target_idx < len(target_phonemes):
                 mispronounced_indices[target_idx] = "incorrect"
             if target_idx + 1 < len(target_phonemes):
                 mispronounced_indices[target_idx + 1] = "incorrect"
             j -= 1
-    
-    # accuracy
-    max_length = max(m, n)
-    final_score = score[m, n]
-    max_possible_score = max_length * match_reward
-    accuracy = (final_score / max_possible_score) * 100 if max_possible_score != 0 else 0
-    accuracy = max(0, min(100, accuracy))
-    
+
     return mispronounced_indices, accuracy
     
 def get_pronunciation_score(target_phrase, target_phonemes, user_phonemes):
@@ -431,20 +430,20 @@ def get_pronunciation_score(target_phrase, target_phonemes, user_phonemes):
     # NOTE: you may be like wtf is going on
     #       you don't need to understand what or why im doing it
     #       [  JUST KNOW ] the data im returning
-
+    # trust process 💀
     error_info = {
         'accuracy': 0, # advanced accuracy metric!
         'incorrect_indices': [], # global character indices for highlighting
         'phoneme_indices': [], # global phoneme indices for highlighting
         'word_feedback': [] # phonemes and start/end positions for all words
     }
-
     # phoneme indices with severity mapping
     mispronounced_indices, error_info['accuracy'] = needleman_wunsch(target_phonemes, user_phonemes)
     
     # split target phrase into words and phonemes into word sublists
     target_word_phonemes = split_phonemes(target_phonemes)
-    original_words = target_phrase.split()
+    # clean punctuation
+    original_words = re.sub(r"[^\w\s']", '', target_phrase).split()
     
     ######### POPULATE WORD_FEEDBACK ###########
     phoneme_index = 0
@@ -513,24 +512,28 @@ def get_pronunciation_score(target_phrase, target_phonemes, user_phonemes):
     error_info['phoneme_indices'] = [(index, sev) for index, sev in mispronounced_indices.items()]
     
     return error_info
+
 # EXAMPLE #
 def test_alignment():
     from panphon.distance import Distance
     import numpy as np
     import text_processing as tp
     
-    target = "Yesterday I went to the grocery store to buy some fresh vegetables"
-    user = "Yesterday I went to grocery stair to buy some fresh vegetables"
-    
-    target_phoneme = tp.text_to_ipa_phoneme(target)
-    user = tp.text_to_ipa_phoneme(user)
+    target = "the, quick. brown.. fox!"
+    user = "yuh quick brown fox"
+
+    target_phonemes = tp.text_to_ipa_phoneme(target)
+    user_phonemes = tp.text_to_ipa_phoneme(user)
+
+    #target_phonemes = ['ð', 'ʌ', ' ', 'k', 'w', 'ɪ', 'k', ' ', 'b', 'ɹ', 'aʊ', 'n', ' ', 'f', 'ɑ', 'k', 's']
+    #user_phonemes = ['j', 'ʌ', ' ', 'k', 'w', 'ɪ', 'k', ' ', 'b', 'ɹ', 'aʊ', 'n', ' ', 'f', 'ɑ', 'k', 's']
+    print(user)
     ### you can uncomment the print statements but this is final result
-    needleman_wunsch_with_debug(target_phoneme, user)
+    needleman_wunsch_with_debug(target_phonemes, user_phonemes)
 
-    score = get_pronunciation_score(target, target_phoneme, user)
-    # print(score)
+    score = get_pronunciation_score(target, target_phonemes, user_phonemes)
+    #print(score['phoneme_indices'])
+    print(score)
 
-
-# Run test
 if __name__ == "__main__":
     test_alignment()

@@ -1,6 +1,6 @@
 import os
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-
+import numpy as np
 import torch
 import sounddevice as sd
 import librosa 
@@ -40,19 +40,42 @@ class STTModel:
             else 'mps' if torch.backends.mps.is_available() 
             else 'cpu'
         )
+        self.device = torch.device('cpu')
+        print(f"Using device: {self.device} for speech recognition")
         self.model.to(self.device)
-            
+        
     def transcribe(self, audio_path):
-        audio_input = load_audio(audio_path, self.sample_rate)
-        input_values = self.processor(audio_input, return_tensors="pt", sampling_rate=self.sample_rate).input_values
-        input_values = input_values.to(self.device)
-
-        with torch.no_grad():
-            logits = self.model(input_values).logits
-        predicted_ids = torch.argmax(logits, dim=-1)
-        transcription = self.processor.decode(predicted_ids[0])
-
-        return transcription
+        try:
+            print(f"Starting transcription of {audio_path}...")
+            if not os.path.exists(audio_path):
+                print(f"Error: Audio file {audio_path} does not exist!")
+                return ""
+                
+            # Check file size
+            file_size = os.path.getsize(audio_path)
+            print(f"Audio file size: {file_size} bytes")
+            if file_size < 100:
+                print("Warning: Audio file is too small, may be empty")
+                return ""
+                
+            audio_input = load_audio(audio_path, self.sample_rate)
+            print(f"Audio loaded, shape: {audio_input.shape}, max value: {np.max(np.abs(audio_input))}")
+            
+            input_values = self.processor(audio_input, return_tensors="pt", sampling_rate=self.sample_rate).input_values
+            input_values = input_values.to(self.device)
+            
+            with torch.no_grad():
+                logits = self.model(input_values).logits
+            predicted_ids = torch.argmax(logits, dim=-1)
+            transcription = self.processor.decode(predicted_ids[0])
+            
+            print(f"Transcription result: '{transcription}'")
+            return transcription
+        except Exception as e:
+            print(f"Error during transcription: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return ""
 
 class WhisperModel:
     def __init__(self, model_name="openai/whisper-small.en", sample_rate=16000):

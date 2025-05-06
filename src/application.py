@@ -5,7 +5,6 @@ import text_processing as tp
 import error_detection as ed
 import models as md
 from audio_recorder import AudioRecorder
-
 import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -13,8 +12,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from pronunciation_panel import PronunciationPanel
 from jaide_gui import JaideGUI
-
-
 
 class Application:
     def __init__(self):
@@ -46,7 +43,7 @@ class Application:
         self.root.option_add("*TLabel*Background", self.background)
         self.root.option_add("*TLabel*Foreground", "black")
         ####_______________________________________________####
-        self.recorder = AudioRecorder(callback=self.process_audio)
+        self.recorder = AudioRecorder(callback=self.process_audio, tag="pronunciation")
         self.stt_model = md.STTModel()
 
         self.current_text = gen_random_text()
@@ -483,7 +480,7 @@ class Application:
 
     def enable_speech_ui(self):
         self.speech_enable = True
-        self.recorder.set_callback(self.process_audio)
+        self.recorder.set_callback_and_tag(self.process_audio, "pronunciation")
         self.gen_text_canvas.pack(pady=0)
         self.gen_text_canvas.update()
         self.user_phoneme_canvas.pack(pady=20)
@@ -521,7 +518,7 @@ class Application:
 
     def enable_ai_model_ui(self):
         self.ai_model_enable = True
-        self.recorder.set_callback(self.jaide_gui.handle_audio)
+        self.recorder.set_callback_and_tag(self.jaide_gui.handle_audio, "grammar_help")
         self.jaide_gui_frame.pack(pady=20, padx=20, fill="both", expand=True)
         self.root.update()
 
