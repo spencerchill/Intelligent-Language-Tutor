@@ -1,7 +1,17 @@
 import spacy
-import random
+import errant
 from transformers import AutoTokenizer, T5ForConditionalGeneration
-from difflib import SequenceMatcher
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from res.chat_bot_templates import EXPLANATION_TEMPLATES
+import text_processing as tp
+
+from enum import Enum
+import random
+import re
+
 
 try:
     nlp = spacy.load("en_core_web_sm")
@@ -10,14 +20,17 @@ except OSError:
     spacy.cli.download("en_core_web_sm")
     nlp = spacy.load("en_core_web_sm")
 
+class ConversationState(Enum):
+    INITIAL_GREETING = "INITIAL_GREETING"
+    WAITING_FOR_NAME = "WAITING_FOR_NAME"
+    CONVERSING = "CONVERSING"
+
 class Jaide:
     def __init__(self):
         self.bot_name = "jaide"
-        self.user_name = None
-        self.user_info = {}
-       
+        self.user_name = None       
         ######### IMOPORTANT #########
-        # IDGAF RN I will abstract these into JSON later LOL
+        # IDGAF RN I'm not extending this just keep it here its good
         self.practice_topics = {
             "daily_routines": [
                 "What time do you usually wake up in the morning?",
@@ -91,7 +104,7 @@ class Jaide:
             ]
         }
         # whenever we extract a key word from user text
-        self.topic_feedback_templates = {
+        self.response_templates = {
             "travel": [
                 "{}? That sounds like a fascinating destination!",
                 "I've heard good things about {}.",
@@ -118,13 +131,12 @@ class Jaide:
             ],
             "movies_and_tv": [
                 "{} is a classic!",
-                "I’ve seen {} too — it’s really good!",
+                "I’ve seen {} too, it’s really good!",
                 "Many people love {}.",
                 "Oh, {}? Great choice!"
             ]
         }
-       
-        # TODO: change these positive feedback responses based on grammar errors
+
         self.positive_feedback = [
             "That's great!",
             "Interesting!",
@@ -141,18 +153,25 @@ class Jaide:
             "Time to dive into {}.",
             "Let’s chat about {} now."
         ]
+
+        self.topic_entity_labels = {
+            "travel": {"GPE", "LOC", "FAC", "ORG"},
+            "hobbies": {"PRODUCT", "ORG", "EVENT", "WORK_OF_ART"},
+            "food": {"PRODUCT", "ORG", "NORP"},
+            "music": {"PERSON", "ORG", "WORK_OF_ART", "EVENT"},
+            "movies_and_tv": {"WORK_OF_ART", "PERSON", "ORG", "EVENT"},
+        }
        
         # init
         self.current_topic = random.choice(list(self.practice_topics.keys()))
+        self.current_question = None
         self.used_questions = set()
-       
-        # conversation state
-        self.first_interaction = True
-        self.asked_name = False
-        self.conversation_turns = 0
-
+        self.conversation_state = ConversationState.INITIAL_GREETING
+        
+        self.annotator = errant.load('en')
         self.tokenizer = AutoTokenizer.from_pretrained("grammarly/coedit-large")
         self.model = T5ForConditionalGeneration.from_pretrained("grammarly/coedit-large")
+        self.annotator = errant.load('en')
    
     def check_grammar(self, user_text):
         input_text = f'Fix grammatical errors in this sentence: {user_text}.'
@@ -160,158 +179,147 @@ class Jaide:
         outputs = self.model.generate(input_ids, max_length=256)
         edited_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        diffs = self.get_differences(user_text, edited_text)
-        feedback = self.explain_differences(diffs, user_text.split(), edited_text.split())
+        feedback = self.explain_differences(user_text, edited_text)
         return feedback, edited_text
 
-    def get_differences(self, original, corrected):
-        orig_tokens = original.split()
-        corr_tokens = corrected.split()
-        matcher = SequenceMatcher(None, orig_tokens, corr_tokens)
-        diffs = []
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            if tag != 'equal':
-                diffs.append({
-                    "type": tag,
-                    "original": orig_tokens[i1:i2],
-                    "corrected": corr_tokens[j1:j2]
-                })
-        return diffs
+    def detect_name_fallback(self, user_input):
+        # fallback if entity extraction fails
+        lower_input = user_input.lower()
+        
+        if len(lower_input.split()) == 1:
+            return lower_input.capitalize()
+        elif "my name is" in lower_input and self.user_name is None:
+            return lower_input.split("my name is", 1)[1].strip().split()[0].capitalize()
+        elif "i am " in lower_input and self.user_name is None:
+            return lower_input.split("i am", 1)[1].strip().split()[0].capitalize()
+        elif "i'm " in lower_input and self.user_name is None:
+            return lower_input.split("i'm", 1)[1].strip().split()[0].capitalize()
+        else:
+            return "Friend"
 
-    def explain_differences(self, diffs, orig_tokens, corr_tokens):
-        feedback = []
-        for diff in diffs:
-            orig = " ".join(diff["original"])
-            corr = " ".join(diff["corrected"])
-            if diff["type"] == "replace":
-                feedback.append(f"You said '{orig}', but it's more natural to say '{corr}'.")
-            elif diff["type"] == "delete":
-                feedback.append(f"You said '{orig}', but it can be removed.")
-            elif diff["type"] == "insert":
-                # find where the insertion happened
-                index = corr_tokens.index(diff["corrected"][0])
-                before = corr_tokens[index - 1] if index > 0 else ""
-                after = corr_tokens[index + len(diff["corrected"])] if index + len(diff["corrected"]) < len(corr_tokens) else ""
-                if before and after:
-                    feedback.append(f"It’s better to include '{corr}' between '{before}' and '{after}'.")
-                elif before:
-                    feedback.append(f"It’s better to include '{corr}' after '{before}'.")
-                elif after:
-                    feedback.append(f"It’s better to include '{corr}' before '{after}'.")
-                else:
-                    feedback.append(f"It’s better to include '{corr}' somewhere in the sentence.")
-        return feedback
+    def explain_differences(self, original, corrected):
+        # remove punctuation, messes IT ALL UPPPP
+        cleaned_corrected = re.sub(r'[,.!?]', '', corrected)
+
+        orig_tokens = self.annotator.parse(original)
+        cor_tokens  = self.annotator.parse(cleaned_corrected)
+        edits = self.annotator.annotate(orig_tokens, cor_tokens)
+ 
+        explanations = []
+        for edit in edits:
+
+            original_text = edit.o_str
+            corrected_text = edit.c_str
+            edit_type = edit.type
+            template = EXPLANATION_TEMPLATES.get(edit_type, "The word '{word}' was changed.")
+
+            explanation = template.format(word=original_text, correction=corrected_text)
+            explanations.append(explanation)
+
+        return explanations
 
     def reset_conversation(self):
-        #TODO: create button to do this
         self.user_name = None
-        self.user_info = {}
         self.current_topic = random.choice(list(self.practice_topics.keys()))
         self.used_questions = set()
-        self.first_interaction = True
-        self.asked_name = False
-        self.conversation_turns = 0
+        self.conversation_state = ConversationState.INITIAL_GREETING
    
     def get_next_practice_question(self):
-        # gets netx practice question and changes topic if no questions available
+        # gets next practice question and changes topic if no questions available
         prev_topic = self.current_topic
         available_questions = [q for q in self.practice_topics[self.current_topic]
                                 if q not in self.used_questions]
 
         topic_changed = False
         if not available_questions:
-            while self.current_topic == prev_topic and len(self.practice_topics) > 1:
+            while self.current_topic == prev_topic:
                 self.current_topic = random.choice(list(self.practice_topics.keys()))
             self.used_questions = set()
             available_questions = self.practice_topics[self.current_topic]
             topic_changed = True
 
         question = random.choice(available_questions)
+        self.current_question = question
         self.used_questions.add(question)
         return question, topic_changed
-   
-    def detect_user_info(self, user_input):
-        # heuristics
-        # TODO: make this better
-        lower_input = user_input.lower()
-        if "my name is" in lower_input and self.user_name is None:
-            self.user_name = lower_input.split("my name is", 1)[1].strip().split()[0]
-        elif "i am " in lower_input and self.user_name is None:
-            self.user_name = lower_input.split("i am", 1)[1].strip().split()[0]
-        elif "i'm " in lower_input and self.user_name is None:
-            self.user_name = lower_input.split("i'm", 1)[1].strip().split()[0]
-   
-    def respond(self, user_input):
-        # get name using basic rule
-        self.detect_user_info(user_input)
-        # might delete this
-        self.conversation_turns += 1
-       
+
+    def get_pronunciation_help(self, word):
+        phonemes = tp.text_to_ipa_phoneme(word)
+        phoneme_str = " ".join(f"/{phoneme}/" for phoneme in phonemes)
+        pronunciation_message = f"Here are the phonemes for '{word}': {phoneme_str}"
         
-        # first interaction
-        if self.first_interaction:
-            self.first_interaction = False
-            if self.user_name:
-                question, topic_changed = self.get_next_practice_question() # don't need changed topic
-                response = f"Nice to meet you, {self.user_name}! I'm your English practice assistant, jaide. Let's practice with some questions about {self.current_topic.replace('_', ' ')}. {question}"
+        question_message = "Now, what's your name?"
+        if self.current_question is not None:
+            question_message = f"Let's go back to where we were. {self.current_question}"
+        return pronunciation_message, question_message
+
+    def respond(self, user_input):
+        # === State Checking ===
+        if self.conversation_state == ConversationState.INITIAL_GREETING:
+
+            response_text = (
+                "Hi there! I'm here to help you learn English. You can either type or speak your responses.\n"
+                "        If you'd like pronunciation help, just type 'Help me pronounce [word]'.\n"
+                "        For example, you can say 'Help me pronounce apple'.\n"
+                "        What's your name?"
+            )
+            self.conversation_state = ConversationState.WAITING_FOR_NAME
+            return response_text, None
+
+        elif self.conversation_state == ConversationState.WAITING_FOR_NAME:
+            # try to extract users name
+            doc = nlp(user_input)
+            name = None
+            for ent in doc.ents:
+                if ent.label_ == "PERSON":
+                    name = ent.text.strip().title()
+                    break
+
+            self.user_name = name if name else self.detect_name_fallback(user_input)
+            greeting = f"Nice to meet you, {self.user_name}! "
+            # build response
+            self.conversation_state = ConversationState.CONVERSING
+            question, topic_changed = self.get_next_practice_question()
+            topic_intro = f"Let's practice with some questions about {self.current_topic.replace('_', ' ')}. "
+            response = f"{greeting} {topic_intro} {question}"
+            return response, None
+
+        elif self.conversation_state == ConversationState.CONVERSING:
+            grammar_feedback, edited_sentence = self.check_grammar(user_input)
+            relevant_labels = self.topic_entity_labels.get(self.current_topic, set())
+            # extract entities relevant to topic
+            doc = nlp(edited_sentence)
+            extracted_entity_text = None
+            for ent in doc.ents:
+                if ent.label_ in relevant_labels:
+                    extracted_entity_text = ent.text
+                    break
+
+            response_comment = ""
+            response_template_list = self.response_templates.get(self.current_topic)
+            if extracted_entity_text and response_template_list:
+                template = random.choice(response_template_list)
+                response_comment = template.format(extracted_entity_text)
             else:
-                self.asked_name = True
-                response = "I couldn't quite catch that. What's your name?"
-            return response, None
-       
-        # I need to rework this as it is awful
-        if self.asked_name and self.conversation_turns == 2:
-            self.asked_name = False
+                response_comment = random.choice(self.positive_feedback)
 
-            if not self.user_name:
-                self.user_name = user_input.split()[0]  # I need to make this better
-           
-            question, topic_changed = self.get_next_practice_question() # don't need changed topic
-            response = f"Nice to meet you, {self.user_name}! I'm your English practice assistant, jaide. Let's practice with some questions about {self.current_topic.replace('_', ' ')}. {question}"
-            return response, None
+            question, topic_changed = self.get_next_practice_question()
+            # need to seperate between parts for highlighting
+            response_data = {
+                "response_comment": response_comment,
+                "grammar": grammar_feedback or [],
+                "question": question
+            }
 
-        grammar_feedback, edited_sentence = self.check_grammar(user_input)
-        doc = nlp(user_input)
+            if topic_changed:
+                transition = random.choice(self.topic_transition_templates).format(self.current_topic.replace('_', ' '))
+                response_data["transition"] = transition
 
-        relevant_labels = set()
-        if self.current_topic == "travel":
-            relevant_labels = {"GPE", "LOC", "FAC"}
-        elif self.current_topic == "hobbies":
-            relevant_labels = {"PRODUCT", "ORG", "EVENT", "WORK_OF_ART"}
-
-        elif self.current_topic == "food":
-            relevant_labels = {"PRODUCT", "ORG"}
-
-        elif self.current_topic == "music":
-            relevant_labels = {"PERSON", "ORG", "WORK_OF_ART"}
-
-        elif self.current_topic == "movies_and_tv":
-            relevant_labels = {"WORK_OF_ART", "PERSON", "ORG"}
-
-        extracted_entity_text = None
-        for ent in doc.ents:
-            if ent.label_ in relevant_labels:
-                extracted_entity_text = ent.text
-                break
-        # choose feedback based on entity found or not
-        feedback_templates = self.topic_feedback_templates.get(self.current_topic, ["Okay, {}."])
-        if extracted_entity_text:
-            template = random.choice(feedback_templates)
-            feedback = template.format(extracted_entity_text)
-        else:
-            feedback = random.choice(self.positive_feedback)
-
-        question, topic_changed = self.get_next_practice_question()
-
-        response_data = {
-            "feedback": feedback,
-            "grammar": grammar_feedback[::] if grammar_feedback else [],
-            "question": question
-        }
-
-        if topic_changed:
-            transition = random.choice(self.topic_transition_templates).format(self.current_topic.replace('_', ' '))
-            response_data["transition"] = transition
-        print(response_data)
-        print(edited_sentence)
-        return response_data, edited_sentence
+            return response_data, edited_sentence
+            
+if __name__ == "__main__":
+    jaide = Jaide()
+    orig = "I writed a letter and she don't go to school"
+    cor ="I wrote a letter and she doesn't go to school"
+    print(jaide.explain_differences(orig, cor))
+    

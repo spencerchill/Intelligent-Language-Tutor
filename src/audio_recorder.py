@@ -13,16 +13,18 @@ RATE = 44100
 CHUNK = 1024
 
 class AudioRecorder:
-    def __init__(self, callback):
+    def __init__(self, callback, tag):
         self._is_recording = False
         self.audio = pyaudio.PyAudio()
+        self.tag = tag
         # avoid circular dependency between app and recorder
         self.callback = callback
         self.filename = None
 
-    def set_callback(self, callback):
+    def set_callback_and_tag(self, callback, tag):
         # used when transfering tabs
         self.callback = callback
+        self.tag = tag
         
     def play_recording(self):
         """Play the last recorded audio file."""
@@ -76,8 +78,9 @@ class AudioRecorder:
         stream.stop_stream()
         stream.close()
 
-        
-        self.filename = f"user_recording.wav"
+        print(self.callback)
+        #tagging system to manage multiple files
+        self.filename = f"{self.tag}_user_recording.wav"
         # Save the recording to a WAV file
         with wave.open(self.filename, "wb") as wf:
             wf.setnchannels(CHANNELS)
