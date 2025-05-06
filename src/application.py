@@ -443,6 +443,8 @@ class Application:
             canvas_widget = canvas.get_tk_widget()
             canvas_widget.pack()
 
+            plt.close(fig)
+
         except Exception as e:
             print("Error generating spectrogram:", e)
 
