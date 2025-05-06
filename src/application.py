@@ -24,7 +24,7 @@ class Application:
         self.background = "#e9ecef"
         self.box_color = "white"
         self.title_font = "Nunito 30 bold"
-        self.font = "Inter 16"
+        self.font = "Inter 12"
         self.text_fill = "black"
 
         self.speech_enable = True
@@ -69,7 +69,7 @@ class Application:
         style = ttk.Style()
         ##### TAB BUTTON STYLE #####
         style.configure("Custom.TButton",
-                        font=self.font,
+                        font="Inter 12",
                         foreground=self.text_fill,
                         background="white",
                         relief="flat")
@@ -134,7 +134,8 @@ class Application:
                                     wrap="word", width=40, height=4,
                                     borderwidth=0, highlightthickness=0,
                                     background=self.box_color,
-                                    fg=self.text_fill)
+                                    fg=self.text_fill,
+                                    padx=(8))
                                     
         self.text_display.insert("1.0", self.current_text)
         self.text_display.config(state="disabled")
@@ -153,7 +154,7 @@ class Application:
             text="🎧Listen",
             command=lambda: self.play_tts(self.current_text),
             style="Custom.TButton",
-            width=8.05
+            width=7
         )
 
         self.gen_text_canvas.create_window(550, 50, window=self.gen_play_button)
@@ -168,7 +169,8 @@ class Application:
         self.phoneme_display = tk.Text(self.user_phoneme_canvas, font=self.font, wrap="word",
                                        fg=self.text_fill, height=4, width=40,
                                        borderwidth=0, highlightthickness=0,
-                                       background=self.box_color)
+                                       background=self.box_color,
+                                       padx=(8))
                                     
         self.phoneme_display.insert("1.0", self.display_phoneme)
         self.phoneme_display.config(state="disabled")
@@ -187,7 +189,7 @@ class Application:
             text="▶️Play",
             command=self.recorder.play_recording,
             style="Custom.TButton",
-            width=8,
+            width=7,
             state="disabled"
         )
 
@@ -310,7 +312,7 @@ class Application:
             style="Custom.TButton"
         )
 
-        self.gen_text_canvas.create_window(50, 50, window=self.target_phrase_tutorial_btn)
+        self.gen_text_canvas.create_window(30, 50, window=self.target_phrase_tutorial_btn)
 
 
                 ### Phoneme GUI ###
@@ -335,7 +337,7 @@ class Application:
             style="Custom.TButton"
         )
 
-        self.user_phoneme_canvas.create_window(50, 50, window=self.phoneme_tutorial_btn)
+        self.user_phoneme_canvas.create_window(30, 50, window=self.phoneme_tutorial_btn)
 
 
     ### Tutorial GUI Transitions ###
