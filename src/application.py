@@ -5,7 +5,6 @@ import text_processing as tp
 import error_detection as ed
 import models as md
 from audio_recorder import AudioRecorder
-from PIL import Image, ImageTk
 import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
