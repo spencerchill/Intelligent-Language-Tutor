@@ -10,3 +10,9 @@ pydub
 gtts
 panphon
 spacy
+tkinter
+mathplotlib
+scipy
+numpy
+errant
+gtts

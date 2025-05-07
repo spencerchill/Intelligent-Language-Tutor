@@ -416,7 +416,7 @@ class Application:
 
         
     def show_spectrogram(self):
-        filename = "user_recording.wav"
+        filename = "pronunciation_user_recording.wav"
         if not filename:
             print("No recording available.")
             return
